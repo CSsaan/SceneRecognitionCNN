@@ -1,0 +1,39 @@
+[project]
+name = "scenerecognitioncnn"
+version = "0.1.0"
+description = "A CNN-based scene recognition system for classifying natural scenes environments"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "opencv-python>=4.12.0.88",
+    "pyyaml>=6.0.3",
+    "tensorboard>=2.20.0",
+    "thop>=0.1.1.post2209072238",
+    "torch>=2.8.0",
+    "torchsummary>=1.5.1",
+    "torchvision>=0.23.0",
+    "tqdm>=4.67.1",
+    "transformers>=4.57.1",
+]
+
+[tool.uv.sources]
+torch = [
+  { index = "pytorch-cu128", marker = "sys_platform == 'linux' or sys_platform == 'win32'" },
+]
+torchvision = [
+  { index = "pytorch-cu128", marker = "sys_platform == 'linux' or sys_platform == 'win32'" },
+]
+
+[[tool.uv.index]]
+url = "https://pypi.tuna.tsinghua.edu.cn/simple"
+default = true
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+[[tool.uv.index]]
+name = "pytorch-cu128"
+url = "https://download.pytorch.org/whl/cu128"
+explicit = true
