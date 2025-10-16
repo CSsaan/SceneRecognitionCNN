@@ -4,7 +4,7 @@ img_size: 224               # input image size
 dataset_dir: '../Datasets/CUB_200_2011'                          # '../Datasets/places365standard_easyformat/places365_standard' | '../Datasets/CUB_200_2011'
 
 pretrained_weights: 'checkpoints/weights/resnet18_places365.pth' # 'checkpoints/weights/resnet18_places365.pth' # path to pretrained weights - (Required)
-resume: 'checkpoints/resnet18_latest.pth'                        # Checkpoint resuming | path to latest checkpoint - (NotUse: None)
+resume: ''                        # Checkpoint resuming | path to latest checkpoint - (NotUse: None)
 
 use_freeze_backbone: False  # freeze backbone when transfer-learning
 use_dataLoaderCache: True   # use cache for faster dataloading(but use more memory)

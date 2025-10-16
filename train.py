@@ -59,7 +59,7 @@ class SceneRecognitionTrainer:
             backbone = AutoModel.from_pretrained(MODEL_NAME_OR_PATH)
             self.model = DinoV3Linear(backbone, self.cfg.num_classes, freeze_backbone=self.cfg.use_freeze_backbone) # freze backbone
         elif self.cfg.arch.lower().startswith('resnet') or self.cfg.arch.lower().startswith('vgg'):
-            backbone = models.__dict__[self.cfg.arch](num_classes=self.cfg.num_classes) # , pretrained=True
+            backbone = models.__dict__[self.cfg.arch](num_classes=365) # , pretrained=True
             self.model = ResNetLinear(backbone, self.cfg.num_classes, freeze_backbone=self.cfg.use_freeze_backbone, pretrained_weights_path=self.cfg.pretrained_weights) # freze backbone
         else:
             raise ValueError(f"Unsupported architecture '{self.cfg.arch}'")
