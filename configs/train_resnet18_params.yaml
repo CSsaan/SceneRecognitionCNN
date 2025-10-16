@@ -1,0 +1,23 @@
+num_classes: 200            # number of classes
+img_size: 224               # input image size
+
+dataset_dir: '../Datasets/CUB_200_2011'                          # '../Datasets/places365standard_easyformat/places365_standard' | '../Datasets/CUB_200_2011'
+
+pretrained_weights: 'checkpoints/weights/resnet18_places365.pth' # 'checkpoints/weights/resnet18_places365.pth' # path to pretrained weights - (Required)
+resume: 'checkpoints/resnet18_latest.pth'                        # Checkpoint resuming | path to latest checkpoint - (NotUse: None)
+
+use_freeze_backbone: False  # freeze backbone when transfer-learning
+use_dataLoaderCache: True   # use cache for faster dataloading(but use more memory)
+use_amp: False              # use automatic mixed precision
+
+arch: 'resnet18'            # model architecture in torchvision.models(e.g. resnet18, vgg, etc)
+start_epoch: 0              # start epoch
+epochs: 90                  # number of epochs to train
+
+lr: 0.001                   # starting learning rate(finetune or transfer-learning needs small lr, e.g. 0.00001)
+batch_size: 8               # batch size
+workers: 6                  # number of data loading workers
+momentum: 0.9               # momentum in Optimizer
+weight_decay: 0.0001        # weight decay in Optimizer
+
+evaluate: False             # evaluate model on validation set

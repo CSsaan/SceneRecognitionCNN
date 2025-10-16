@@ -14,6 +14,7 @@ from torch.utils.tensorboard import SummaryWriter
 import torchvision.models as models
 from transformers import AutoImageProcessor, AutoModel, AutoConfig, get_cosine_schedule_with_warmup
 
+from models.dinov3_linear import DinoV3Linear
 from models.resnet_linear import ResNetLinear
 from utils.metrics import AverageMeter, compute_accuracy
 from utils.model_statistics import detailed_model_summary
@@ -53,9 +54,16 @@ class SceneRecognitionTrainer:
     def _init_model(self):
         """初始化模型"""
         print(f"[Creating model '{self.cfg.arch}']")
-        backbone = models.__dict__[self.cfg.arch](num_classes=self.cfg.num_classes) # , pretrained=True
-        self.model = ResNetLinear(backbone, self.cfg.num_classes, freeze_backbone=self.cfg.use_freeze_backbone, pretrained_weights_path=self.cfg.pretrained_weights) # freze backbone
-        
+        if self.cfg.arch == 'dinov3':
+            MODEL_NAME_OR_PATH = self.cfg.pretrained_weights # "./checkpoints/weights/dinov3-vits16-pretrain-lvd1689m"
+            backbone = AutoModel.from_pretrained(MODEL_NAME_OR_PATH)
+            self.model = DinoV3Linear(backbone, self.cfg.num_classes, freeze_backbone=self.cfg.use_freeze_backbone) # freze backbone
+        elif self.cfg.arch.lower().startswith('resnet') or self.cfg.arch.lower().startswith('vgg'):
+            backbone = models.__dict__[self.cfg.arch](num_classes=self.cfg.num_classes) # , pretrained=True
+            self.model = ResNetLinear(backbone, self.cfg.num_classes, freeze_backbone=self.cfg.use_freeze_backbone, pretrained_weights_path=self.cfg.pretrained_weights) # freze backbone
+        else:
+            raise ValueError(f"Unsupported architecture '{self.cfg.arch}'")
+
         # DataParallel
         device_ids = list(range(torch.cuda.device_count()))
         print(f"正在使用 {torch.cuda.device_count()} 个 GPU 进行训练！")
@@ -69,12 +77,12 @@ class SceneRecognitionTrainer:
     def _init_optimizer(self):
         """初始化优化器"""
         self.optimizer = torch.optim.SGD(filter(lambda p: p.requires_grad, self.model.parameters()), self.cfg.lr, momentum=self.cfg.momentum, weight_decay=self.cfg.weight_decay)
-        # torch.optim.AdamW(filter(lambda p: p.requires_grad, self.model.parameters()), lr=self.cfg.lr, weight_decay=self.cfg.weight_decay)
+        # self.optimizer = torch.optim.AdamW(filter(lambda p: p.requires_grad, self.model.parameters()), lr=self.cfg.lr, weight_decay=self.cfg.weight_decay)
     
     def _init_scheduler(self):
         """初始化学习率调度器"""
-        self.scheduler = torch.optim.lr_scheduler.StepLR(self.optimizer, step_size=30, gamma=0.1)
-        self.scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(self.optimizer, T_max=self.cfg.epochs, eta_min=0.0001)
+        # self.scheduler = torch.optim.lr_scheduler.StepLR(self.optimizer, step_size=30, gamma=0.1)
+        self.scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(self.optimizer, T_max=self.cfg.epochs, eta_min=self.cfg.lr * 0.001)
         # self.scheduler = get_cosine_schedule_with_warmup(self.optimizer, num_warmup_steps=int(0.05*self.cfg.epochs), num_training_steps=self.cfg.epochs)
         
     def _init_dataloaders(self):
@@ -84,7 +92,7 @@ class SceneRecognitionTrainer:
                 data_path=self.cfg.dataset_dir,
                 batch_size=self.cfg.batch_size,
                 workers=self.cfg.workers,
-                cache_size=[224, 224],
+                cache_size=[self.cfg.img_size, self.cfg.img_size],
                 cache_boost=False
             )
         else:
@@ -92,7 +100,7 @@ class SceneRecognitionTrainer:
                 data_path=self.cfg.dataset_dir,
                 batch_size=self.cfg.batch_size,
                 workers=self.cfg.workers,
-                cache_size=[224, 224]
+                cache_size=[self.cfg.img_size, self.cfg.img_size]
             )
         print(f"[Using {len(self.train_loader)} batches for training, {len(self.val_loader)} for validation]")
 
@@ -111,7 +119,7 @@ class SceneRecognitionTrainer:
                 self.scaler.load_state_dict(checkpoint['scaler'])
                 self.cfg.start_epoch = checkpoint['epoch']
                 self.best_prec1 = checkpoint['best_prec1']
-                self.model.load_state_dict(checkpoint['state_dict'])
+                self.model.load_state_dict(checkpoint['state_dict'], strict=False)
                 print(f"=> loaded checkpoint '{self.cfg.resume}' (epoch {checkpoint['epoch']})")
             else:
                 raise FileNotFoundError(f"No checkpoint found at '{self.cfg.resume}'")
@@ -119,10 +127,10 @@ class SceneRecognitionTrainer:
     def log_model_summary(self):
         """记录模型摘要信息"""
         # 将模型结构写入TensorBoard
-        sample_input = torch.randn(1, 3, 224, 224).to(self.device)
+        sample_input = torch.randn(1, 3, self.cfg.img_size, self.cfg.img_size).to(self.device)
         self.writer.add_graph(self.model, sample_input)
         # 打印模型统计参数
-        detailed_model_summary(self.model, (1, 3, 224, 224))
+        detailed_model_summary(self.model, (1, 3, self.cfg.img_size, self.cfg.img_size))
         
     def train_epoch(self, epoch):
         """训练一个epoch"""
@@ -174,8 +182,8 @@ class SceneRecognitionTrainer:
                 'Data': f'{data_time.val:.3f}({data_time.avg:.3f})',
                 'Loss': f'{losses.val:.4f}({losses.avg:.4f})',
                 'LR': f'{current_lr:.5f}',
-                'Prec@1': f'{top1.val:.3f}({top1.avg:.3f})',
-                'Prec@5': f'{top5.val:.3f}({top5.avg:.3f})'
+                'Prec@1': f'{top1.val:06.3f}({top1.avg:06.3f})',
+                'Prec@5': f'{top5.val:06.3f}({top5.avg:06.3f})'
             }
             pbar_batch.set_postfix(postfix) 
         
@@ -222,8 +230,8 @@ class SceneRecognitionTrainer:
                     'Test': f'[{i}/{len(self.val_loader)}]',
                     'Time': f'{batch_time.val:.3f}({batch_time.avg:.3f})',
                     'Loss': f'{losses.val:.4f}({losses.avg:.4f})',
-                    'Prec@1': f'{top1.val:.3f}({top1.avg:.3f})',
-                    'Prec@5': f'{top5.val:.3f}({top5.avg:.3f})'
+                    'Prec@1': f'{top1.val:06.3f}({top1.avg:06.3f})',
+                    'Prec@5': f'{top5.val:06.3f}({top5.avg:06.3f})'
                 }
                 pbar_batch.set_postfix(postfix)
 
@@ -253,19 +261,19 @@ class SceneRecognitionTrainer:
         }
         
         # 保存模型参数(纯模型结构，不支持断点续训)
-        torch.save(state['state_dict'], save_dir_pure + f"{filename}_Epoch{state['epoch']}_{prec1:.3f}_pure.pth.tar")
+        torch.save(state['state_dict'], save_dir_pure + f"{filename}_Epoch{state['epoch']}_{prec1:.3f}_pure.pth")
         # 保存模型参数(支持断点续训)
-        torch.save(state, save_dir_full + f'{filename}_latest.pth.tar')
+        torch.save(state, save_dir_full + f'{filename}_latest.pth')
         if is_best:
             shutil.copyfile(
-                save_dir_full + f'{filename}_latest.pth.tar', 
-                save_dir_full + f"{filename}_best_Epoch{state['epoch']}_{prec1:.3f}.pth.tar"
+                save_dir_full + f'{filename}_latest.pth', 
+                save_dir_full + f"{filename}_best_Epoch{state['epoch']}_{prec1:.3f}.pth"
             )
         # 定期保存
         if state['epoch'] % epoch_interval == 0:
             shutil.copyfile(
-                save_dir_full + f'{filename}_latest.pth.tar', 
-                save_dir_full + f"{filename}_epoch_Epoch{state['epoch']}_{prec1:.3f}.pth.tar"
+                save_dir_full + f'{filename}_latest.pth', 
+                save_dir_full + f"{filename}_epoch_Epoch{state['epoch']}_{prec1:.3f}.pth"
             )
 
     def train(self):
@@ -312,7 +320,7 @@ def main(cfg):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--cfg', type=str, default='configs/train_params.yaml')
+    parser.add_argument('--cfg', type=str, default='configs/train_resnet18_params.yaml') # train_resnet18_params.yaml | train_dinov3_params.yaml
     args = parser.parse_args()
     cfg = argparse.Namespace(**yaml.load(open(args.cfg), Loader=yaml.SafeLoader))
     

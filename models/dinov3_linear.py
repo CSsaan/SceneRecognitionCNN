@@ -11,11 +11,17 @@ class DinoV3Linear(nn.Module):
             self.backbone.eval()
         
         hidden_size = getattr(backbone.config, "hidden_size", None)
-        self.head = nn.Linear(hidden_size, num_classes)
-
+        if hidden_size is None:
+            raise ValueError("backbone.config must have a 'hidden_size' attribute")
+        self.head = nn.Sequential(
+            nn.Linear(hidden_size, 512),
+            nn.ReLU(inplace=True),
+            nn.Dropout(p=0.1),
+            nn.Linear(512, num_classes)
+        )
     def forward(self, pixel_values):
         outputs = self.backbone(pixel_values=pixel_values)
-        last_hidden = outputs.last_hidden_state
-        cls = last_hidden[:, 0]
+        last_hidden = outputs.last_hidden_state # [1, 201, 384]
+        cls = last_hidden[:, 0, :] # [1, 384]
         logits = self.head(cls)
         return logits

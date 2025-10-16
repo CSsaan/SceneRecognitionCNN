@@ -172,11 +172,10 @@ def get_places365_dataloaders_cache(data_path, batch_size=32, workers=4, cache_s
     train_dataset = Places365CacheDataset(
         data_dir=traindir,
         transform=transforms.Compose([
+            transforms.RandomRotation(15),  # 添加随机旋转
             transforms.RandomResizedCrop(cache_size[0], scale=(0.8, 1.0)),
-            # transforms.RandomCrop(cache_size[0], padding=32),
             transforms.RandomHorizontalFlip(),
-            # transforms.RandomRotation(15),  # 添加随机旋转
-            # transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.1),  # 添加颜色抖动
+            transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.1),  # 添加颜色抖动
             transforms.ToTensor(),
             normalize,
         ]),

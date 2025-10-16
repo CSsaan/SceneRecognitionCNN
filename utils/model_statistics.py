@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-from torchsummary import summary
+from torchinfo import summary
 from thop import profile, clever_format
 import numpy as np
 
@@ -103,43 +103,25 @@ def model_memory_usage(model, input_shape, batch_size=1):
 def detailed_model_summary(model, input_shape):
     """
     生成详细的模型统计信息
-    """
-    # device = next(model.parameters()).device if next(model.parameters()).is_cuda else 'cpu'
-    
+    """    
     print("=" * 80)
     print("MODEL STATISTICS SUMMARY")
-    print("=" * 80)
-    
-    # 基本参数统计
-    params = count_parameters(model)
-    print("-" * 80)
+    print("=" * 80, "\n")
     
     # FLOPs计算
+    print("-" * 80)
+    params = count_parameters(model)
     try:
         flops, _ = calculate_flops(model, input_shape)
         flops_formatted, params_formatted = clever_format([flops, params['total']], "%.3f")
         print(f"Total FLOPs: {flops_formatted}")
         print(f"Total Params: {params_formatted}")
-        print("-" * 80)
     except Exception as e:
         print(f"Could not calculate FLOPs: {str(e)}")
-        print("-" * 80)
-    
-    # # 内存使用估算
-    # try:
-    #     memory = model_memory_usage(model, input_shape)
-    #     print("Memory Usage Estimation:")
-    #     print(f"  Parameters:  {memory['parameters']/1024**2:.2f} MB")
-    #     print(f"  Gradients:   {memory['gradients']/1024**2:.2f} MB")
-    #     print(f"  Buffers:     {memory['buffers']/1024**2:.2f} MB")
-    #     print(f"  Activations: {memory['activations']/1024**2:.2f} MB")
-    #     print(f"  Total:       {memory['total']/1024**2:.2f} MB")
-    #     print("-" * 80)
-    # except Exception as e:
-    #     print(f"Could not estimate memory usage: {str(e)}")
-    #     print("-" * 80)
+    print("-" * 80, "\n")
     
     # 按层统计
+    print("-" * 80)
     layer_params, total_layer_params = layer_wise_parameters(model)
     print("Layer-wise Parameter Distribution:")
     sorted_layers = sorted(layer_params.items(), key=lambda x: x[1], reverse=True)
@@ -152,15 +134,16 @@ def detailed_model_summary(model, input_shape):
         remaining_params = sum(param_count for _, param_count in sorted_layers[10:])
         percentage = (remaining_params / params['total']) * 100
         print(f"  {'Other layers':<40} {remaining_params:>12,} ({percentage:>6.2f}%)")
-    print("-" * 80)
+    print("-" * 80, "\n")
     
     # 模型结构摘要
+    print("-" * 80)
     try:
         print("Model Architecture Summary:")
-        summary(model, input_shape[1:], device="cuda" if torch.cuda.is_available() else "cpu")
+        summary(model, input_shape, device="cuda" if torch.cuda.is_available() else "cpu")
     except Exception as e:
         print(f"Could not generate model summary: {str(e)}")
-    print("=" * 80)
+    print("-" * 80, "\n")
 
 # 使用示例
 if __name__ == "__main__":

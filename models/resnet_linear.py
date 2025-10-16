@@ -27,7 +27,6 @@ class ResNetLinear(nn.Module):
             for p in self.backbone.parameters():
                 p.requires_grad = False
             # self.backbone.eval()
-
         # unfreeze the last layer
         for p in self.backbone.fc.parameters():
             p.requires_grad = True
