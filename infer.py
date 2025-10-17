@@ -8,8 +8,8 @@ from torch.nn import functional as F
 from PIL import Image
 from transformers import AutoImageProcessor, AutoModel, AutoConfig, get_cosine_schedule_with_warmup
 
-from models.dinov3_linear import DinoV3Linear
-from models.resnet_linear import ResNetLinear
+from models import DinoV3Linear
+from models import ResNetLinear
 
 
 # the architecture to use

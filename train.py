@@ -14,8 +14,9 @@ from torch.utils.tensorboard import SummaryWriter
 import torchvision.models as models
 from transformers import AutoImageProcessor, AutoModel, AutoConfig, get_cosine_schedule_with_warmup
 
-from models.dinov3_linear import DinoV3Linear
-from models.resnet_linear import ResNetLinear
+from models import DinoV3Linear
+from models import ResNetLinear
+from models import build_swin_model, load_swin_pretrained
 from utils.metrics import AverageMeter, compute_accuracy
 from utils.model_statistics import detailed_model_summary
 from utils.data_loader_cache import get_places365_dataloaders_cache, get_places365_dataloaders_normal
@@ -55,13 +56,18 @@ class SceneRecognitionTrainer:
     def _init_model(self):
         """初始化模型"""
         print(f"[Creating model '{self.cfg.arch}']")
-        if self.cfg.arch == 'dinov3':
+        model_name = self.cfg.arch.lower()
+        if model_name == 'dinov3':
             MODEL_NAME_OR_PATH = self.cfg.pretrained_weights # "./checkpoints/weights/dinov3-vits16-pretrain-lvd1689m"
             backbone = AutoModel.from_pretrained(MODEL_NAME_OR_PATH)
             self.model = DinoV3Linear(backbone, self.cfg.num_classes, freeze_backbone=self.cfg.use_freeze_backbone) # freze backbone
-        elif self.cfg.arch.lower().startswith('resnet') or self.cfg.arch.lower().startswith('vgg'):
+        elif model_name.startswith('resnet') or model_name.startswith('vgg'):
             backbone = models.__dict__[self.cfg.arch](num_classes=365) # , pretrained=True
             self.model = ResNetLinear(backbone, self.cfg.num_classes, freeze_backbone=self.cfg.use_freeze_backbone, pretrained_weights_path=self.cfg.pretrained_weights) # freze backbone
+        elif model_name == 'swin':
+            self.model = build_swin_model(self.cfg)
+            MODEL_NAME_OR_PATH = self.cfg.pretrained_weights
+            load_swin_pretrained(MODEL_NAME_OR_PATH, self.model)
         else:
             raise ValueError(f"Unsupported architecture '{self.cfg.arch}'")
 
@@ -130,7 +136,11 @@ class SceneRecognitionTrainer:
 
     def _init_criterion(self):
         """初始化损失函数"""
-        self.criterion_train = nn.CrossEntropyLoss().to(self.device) # LabelSmoothCrossEntropy(smoothing=0.1).to(device)
+        if self.cfg.label_smoothing > 0.0:
+            from utils.losses import LabelSmoothCrossEntropy
+            self.criterion_train = LabelSmoothCrossEntropy(smoothing=0.1).to(self.device)
+        else:
+            self.criterion_train = nn.CrossEntropyLoss().to(self.device)
         self.criterion_val = nn.CrossEntropyLoss().to(self.device)
         
     def load_checkpoint(self):
@@ -150,11 +160,17 @@ class SceneRecognitionTrainer:
                 
     def log_model_summary(self):
         """记录模型摘要信息"""
-        # 将模型结构写入TensorBoard
-        sample_input = torch.randn(1, 3, self.cfg.img_size, self.cfg.img_size).to(self.device)
-        self.writer.add_graph(self.model, sample_input)
-        # 打印模型统计参数
-        detailed_model_summary(self.model, (1, 3, self.cfg.img_size, self.cfg.img_size))
+        # # 将模型结构写入TensorBoard
+        # try:
+        #     if not self.cfg.arch.lower().startswith('swin'):
+        #         sample_input = torch.randn(1, 3, self.cfg.img_size, self.cfg.img_size).to(self.device)
+        #         self.writer.add_graph(self.model, sample_input)
+        # except Exception as e:
+        #     print(f"Could not add model graph to TensorBoard: {str(e)}")
+
+        # # 打印模型统计参数
+        # detailed_model_summary(self.model, (1, 3, self.cfg.img_size, self.cfg.img_size))
+        pass
         
     def train_epoch(self, epoch):
         """训练一个epoch"""
@@ -344,7 +360,10 @@ def main(cfg):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--cfg', type=str, default='configs/train_resnet18_params.yaml') # train_resnet18_params.yaml | train_dinov3_params.yaml
+
+    # train_resnet18_params.yaml | train_dinov3_params.yaml | train_swin_params.yaml
+    parser.add_argument('--cfg', type=str, default='configs/train_resnet18_params.yaml')
+
     args = parser.parse_args()
     cfg = argparse.Namespace(**yaml.load(open(args.cfg), Loader=yaml.SafeLoader))
     

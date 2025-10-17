@@ -14,8 +14,8 @@ import random
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, project_root)
 
-from models.dinov3_linear import DinoV3Linear
-from models.resnet_linear import ResNetLinear
+from models import DinoV3Linear
+from models import ResNetLinear
 
 
 class PyTorchToONNXConverter:

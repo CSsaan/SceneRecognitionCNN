@@ -1,0 +1,97 @@
+num_classes: 200            # number of classes
+img_size: 224               # input image size
+
+dataset_dir: '../Datasets/CUB_200_2011'                          # '../Datasets/places365standard_easyformat/places365_standard'     '../Datasets/CUB_200_2011'
+
+pretrained_weights: './checkpoints/weights/swin/swin_tiny_patch4_window7_224.pth' # path to pretrained weights
+resume: ''                                                       # Checkpoint resuming | path to latest checkpoint (default: None)
+
+use_freeze_backbone: False  # freeze backbone when transfer-learning
+use_dataLoaderCache: True   # use cache for faster dataloading(but use more memory)
+use_amp: False              # use automatic mixed precision
+
+arch: 'swin'                # (swin, swinv2, swin_moe, swin_mlp)
+epochs: 90                  # number of epochs to train
+
+scheduler: 'cosine'         # (cosine, cosine_warmup, step, multistep, linear)
+lr: 0.001                   # starting learning rate(finetune or transfer-learning needs small lr, e.g. 0.00001)
+batch_size: 8               # batch size
+workers: 6                  # number of data loading workers
+
+optimizer: 'adamw'          # (adamw, sgd, fused_adam, fused_lamb)
+momentum: 0.9               # momentum in Optimizer
+weight_decay: 0.001         # weight decay in Optimizer
+label_smoothing: 0.0        # label smoothing(default: 0.1)
+
+evaluate: False             # evaluate model on validation set
+
+# Swin Transformer Model
+FUSED_LAYERNORM: False
+DROP_RATE: 0.0
+DROP_PATH_RATE: 0.1
+
+SWIN:
+  PATCH_SIZE: 4
+  IN_CHANS: 3
+  EMBED_DIM: 96
+  DEPTHS: [2, 2, 6, 2]
+  NUM_HEADS: [3, 6, 12, 24]
+  WINDOW_SIZE: 7
+  MLP_RATIO: 4.
+  QKV_BIAS: True
+  QK_SCALE: None
+  APE: False
+  PATCH_NORM: True
+
+SWINV2:
+  PATCH_SIZE: 4
+  IN_CHANS: 3
+  EMBED_DIM: 96
+  DEPTHS: [2, 2, 6, 2]
+  NUM_HEADS: [3, 6, 12, 24]
+  WINDOW_SIZE: 7
+  MLP_RATIO: 4.
+  QKV_BIAS: True
+  APE: False
+  PATCH_NORM: True
+  PRETRAINED_WINDOW_SIZES: [0, 0, 0, 0]
+
+SWIN_MOE:
+  PATCH_SIZE: 4
+  IN_CHANS: 3
+  EMBED_DIM: 96
+  DEPTHS: [2, 2, 6, 2]
+  NUM_HEADS: [3, 6, 12, 24]
+  WINDOW_SIZE: 7
+  MLP_RATIO: 4.
+  QKV_BIAS: True
+  QK_SCALE: None
+  APE: False
+  PATCH_NORM: True
+  MLP_FC2_BIAS: True
+  INIT_STD: 0.02
+  PRETRAINED_WINDOW_SIZES: [0, 0, 0, 0]
+  MOE_BLOCKS: [[-1], [-1], [-1], [-1]]
+  NUM_LOCAL_EXPERTS: 1
+  TOP_VALUE: 1
+  CAPACITY_FACTOR: 1.25
+  COSINE_ROUTER: False
+  NORMALIZE_GATE: False
+  USE_BPR: True
+  IS_GSHARD_LOSS: False
+  GATE_NOISE: 1.0
+  COSINE_ROUTER_DIM: 256
+  COSINE_ROUTER_INIT_T: 0.5
+  MOE_DROP: 0.0
+  AUX_LOSS_WEIGHT: 0.01
+
+SWIN_MLP:
+  PATCH_SIZE: 4
+  IN_CHANS: 3
+  EMBED_DIM: 96
+  DEPTHS: [2, 2, 6, 2]
+  NUM_HEADS: [3, 6, 12, 24]
+  WINDOW_SIZE: 7
+  MLP_RATIO: 4.
+  APE: False
+  PATCH_NORM: True
