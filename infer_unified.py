@@ -111,7 +111,6 @@ def load_model(arch, num_classes, resume):
     else:
         raise FileNotFoundError(f"No checkpoint found at '{resume}'")
     
-    print(model)
     # 指定要注册钩子的层名
     features_names = ['layer4','avgpool']  # 这是ResNet的最后一个卷积层和平均池化层
     # 为每个指定层注册前向传播钩子
@@ -144,7 +143,10 @@ def main():
     input_img = V(tf(img).unsqueeze(0))
     
     # 前向传播
+    import time
+    start_time = time.time()
     logit = model.forward(input_img)
+    print(f"[Forward time: {time.time() - start_time:.3f}s]")
     h_x = F.softmax(logit, 1).data.squeeze()
     probs, idx = h_x.sort(0, True)
     probs = probs.numpy()

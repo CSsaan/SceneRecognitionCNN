@@ -10,4 +10,5 @@ wheels/
 .venv
 runs/
 checkpoints/
+export/outputs/
 cam-heatmap.jpg

@@ -46,15 +46,14 @@ else:
 
 # load the image transformer
 centre_crop = trn.Compose([
-        trn.Resize(int(224 * 1.2)),
-        trn.CenterCrop(224),
-        # trn.Resize((224,224)),
+        # trn.Resize(int(224 * 1.2)),
+        # trn.CenterCrop(224),
+        trn.Resize((224,224)),
         trn.ToTensor(),
         trn.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
 ])
 
-# load the class label
-
+# load the class labels
 if not os.access(categories_file_name, os.W_OK):
     synset_url = 'https://raw.githubusercontent.com/csailvision/places365/master/categories_places365.txt'
     os.system('wget ' + synset_url + ' -P ./docs/')

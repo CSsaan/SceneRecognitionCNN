@@ -122,16 +122,18 @@ def detailed_model_summary(model, input_shape):
     
     # 按层统计
     print("-" * 80)
+    print_full_layer = False
     layer_params, total_layer_params = layer_wise_parameters(model)
     print("Layer-wise Parameter Distribution:")
     sorted_layers = sorted(layer_params.items(), key=lambda x: x[1], reverse=True)
-    for name, param_count in sorted_layers[:10]:  # 显示前10层
+    end_num = 10 if not print_full_layer else len(layer_params)
+    for name, param_count in sorted_layers[:end_num]:  # 显示前10层
         if param_count > 0:
             percentage = (param_count / params['total']) * 100
             print(f"  {name:<40} {param_count:>12,} ({percentage:>6.2f}%)")
     
-    if len(sorted_layers) > 10:
-        remaining_params = sum(param_count for _, param_count in sorted_layers[10:])
+    if len(sorted_layers) > end_num:
+        remaining_params = sum(param_count for _, param_count in sorted_layers[end_num:])
         percentage = (remaining_params / params['total']) * 100
         print(f"  {'Other layers':<40} {remaining_params:>12,} ({percentage:>6.2f}%)")
     print("-" * 80, "\n")
