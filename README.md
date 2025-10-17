@@ -23,6 +23,11 @@
   - [训练模型](#训练模型)
     - [训练选项](#训练选项)
   - [推理预测](#推理预测)
+    - [PyTorch模型推理](#pytorch模型推理)
+    - [ONNX模型推理](#onnx模型推理)
+  - [模型导出](#模型导出)
+    - [ONNX导出](#onnx导出)
+    - [模型量化](#模型量化)
   - [性能优化](#性能优化)
     - [数据加载优化](#数据加载优化)
     - [混合精度训练](#混合精度训练)
@@ -44,6 +49,8 @@ Scene Recognition CNN是一个专门用于自然场景识别的深度学习项�
 - 模型冻结/微调功能
 - 断点续训功能
 - 详细的模型统计信息
+- ONNX模型导出和推理支持
+- 模型量化优化（动态量化、静态量化）
 
 ## 技术栈
 
@@ -57,6 +64,8 @@ Scene Recognition CNN是一个专门用于自然场景识别的深度学习项�
 - THOP >= 0.1.1
 - PyYAML >= 6.0.3
 - TQDM >= 4.67.1
+- ONNX >= 1.16.0
+- ONNX Runtime >= 1.18.0
 
 ## 项目结构
 
@@ -65,6 +74,11 @@ SceneRecognitionCNN/
 ├── configs/                    # 配置文件目录
 │   ├── train_resnet18_params.yaml
 │   └── train_dinov3_params.yaml
+├── export/                     # 模型导出目录
+│   ├── export_onnx.py          # ONNX导出脚本
+│   ├── infer_onnx.py           # ONNX推理脚本
+│   └── outputs/                # 导出模型目录
+│       ├── *.onnx              # ONNX模型文件
 ├── models/                     # 模型定义目录
 │   ├── dinov3_linear.py
 │   └── resnet_linear.py
@@ -74,9 +88,11 @@ SceneRecognitionCNN/
 │   ├── metrics.py              # 评估指标
 │   └── model_statistics.py     # 模型统计工具
 ├── checkpoints/                # 模型检查点目录
+├── docs/                       # 文档目录
 ├── runs/                       # TensorBoard日志目录
 ├── trainer.py                  # 训练主程序
 ├── infer.py                    # 推理脚本
+├── infer_unified.py            # 统一推理脚本（含可视化）
 ├── pyproject.toml              # 项目依赖配置
 └── README.md                   # 项目说明文档
 ```
@@ -179,11 +195,65 @@ parser.add_argument('--cfg', type=str, default='configs/train_dinov3_params.yaml
 1. **迁移学习**：通过设置`use_freeze_backbone: True`冻结骨干网络，只训练分类头
 2. **混合精度训练**：通过设置`use_amp: True`启用混合精度训练，提高训练速度
 3. **断点续训**：通过设置`resume`参数指定检查点路径恢复训练
-4. **评估模式**：通过设置`evaluate: True`只进行验证，不进行训练
+4. **评估模式**：通过设置`evaluate: True`只进行验证，不进行训练(此时会加载val数据集，要修改成需要的数据-直接改文件夹名称即可)
 
 ## 推理预测
 
+### PyTorch模型推理
+
 使用[infer.py](infer.py)进行单张图片预测：
+
+```bash
+python infer.py
+```
+
+使用[infer_unified.py](infer_unified.py)进行带可视化的预测（包含类激活映射）：
+
+```bash
+python infer_unified.py
+```
+
+### ONNX模型推理
+
+使用[export/infer_onnx.py](export/infer_onnx.py)进行ONNX模型推理：
+
+```bash
+python export/infer_onnx.py --model export/outputs/resnet18.onnx --source path/to/image.jpg
+```
+
+支持多种ONNX模型格式：
+
+- 原始FP32模型
+- 动态量化模型
+- 静态量化模型
+
+## 模型导出
+
+### ONNX导出
+
+使用[export/export_onnx.py](export/export_onnx.py)脚本将PyTorch模型导出为ONNX格式：
+
+```bash
+python export/export_onnx.py
+```
+
+该脚本会自动执行以下操作：
+
+1. 加载训练好的PyTorch模型
+2. 导出为ONNX格式
+3. 验证导出的ONNX模型
+4. 对模型进行量化优化
+
+导出的模型将保存在[export/outputs/](export/outputs/)目录中。
+
+### 模型量化
+
+导出过程中会自动生成两种量化版本的ONNX模型：
+
+1. **动态量化模型**：对权重进行量化，推理时动态计算激活值
+2. **静态量化模型**：对权重和激活值都进行量化，需要校准数据
+
+量化可以显著减小模型大小并提高推理速度，通常对精度影响很小。
 
 ## 性能优化
 
@@ -218,6 +288,8 @@ TensorBoard中包含以下信息：
 - 训练/验证准确率曲线
 - 学习率变化曲线
 - 模型结构图
+
+[infer_unified.py](infer_unified.py)还支持类激活映射（CAM）可视化，可以生成热力图显示模型关注的图像区域。
 
 ## 性能指标
 

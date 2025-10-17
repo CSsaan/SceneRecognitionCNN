@@ -1,8 +1,8 @@
 import time
 import argparse
 import numpy as np
-import onnxruntime
 from PIL import Image
+import onnxruntime as ort
 
 import os
 import sys
@@ -27,8 +27,8 @@ class Inference:
             ),
             "CPUExecutionProvider" # 使用CPU推理
         ]
-        self.session = onnxruntime.InferenceSession(model, providers=providers)
-        print("ALL providers:", onnxruntime.get_available_providers())
+        self.session = ort.InferenceSession(model, providers=providers)
+        print("ALL providers:", ort.get_available_providers())
         print("Now Session available providers:", self.session.get_providers())
 
         self.labels = self.load_categories(categories_file)

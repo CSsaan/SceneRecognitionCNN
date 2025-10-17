@@ -33,9 +33,10 @@ class PyTorchToONNXConverter:
             output_path,             # 导出的onnx文件位置
             export_params=True,      # 导出训练好的模型参数
             verbose=False,           # debug message
+            do_constant_folding=True,# 是否进行常数折叠
             input_names=['input'],   # 为静态网络图中的输入节点设置别名，在进行onnx推理时，将input_names字段与输入数据绑定
             output_names=['output'], # 为输出节点设置别名
-            opset_version=13,
+            opset_version=11,
             dynamic_axes={
                 'input': {0: 'batch_size'},
                 'output': {0: 'batch_size'}

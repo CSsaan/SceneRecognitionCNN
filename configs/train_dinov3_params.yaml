@@ -18,6 +18,6 @@ lr: 0.001                   # starting learning rate(finetune or transfer-learni
 batch_size: 8               # batch size
 workers: 6                  # number of data loading workers
 momentum: 0.9               # momentum in Optimizer
-weight_decay: 0.0001        # weight decay in Optimizer
+weight_decay: 0.001         # weight decay in Optimizer
 
 evaluate: False             # evaluate model on validation set
