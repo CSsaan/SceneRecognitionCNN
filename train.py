@@ -31,6 +31,7 @@ def seed_all(seed: int):
 class SceneRecognitionTrainer:
     def __init__(self, config):
         self.cfg = config
+        self.start_epoch = 0
         self.best_prec1 = 0
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         self.scaler = torch.amp.GradScaler(enabled=torch.cuda.is_available() and config.use_amp)
@@ -76,14 +77,37 @@ class SceneRecognitionTrainer:
     
     def _init_optimizer(self):
         """初始化优化器"""
-        self.optimizer = torch.optim.SGD(filter(lambda p: p.requires_grad, self.model.parameters()), self.cfg.lr, momentum=self.cfg.momentum, weight_decay=self.cfg.weight_decay)
-        # self.optimizer = torch.optim.AdamW(filter(lambda p: p.requires_grad, self.model.parameters()), lr=self.cfg.lr, weight_decay=self.cfg.weight_decay)
+        opt_lower = self.cfg.optimizer.lower()
+        parameters = filter(lambda p: p.requires_grad, self.model.parameters())
+
+        if opt_lower == 'sgd':
+            self.optimizer = torch.optim.SGD(parameters, self.cfg.lr, momentum=self.cfg.momentum, weight_decay=self.cfg.weight_decay)
+        elif opt_lower == 'adamw':
+            self.optimizer = torch.optim.AdamW(parameters, lr=self.cfg.lr, weight_decay=self.cfg.weight_decay)
+        elif opt_lower == 'fused_adam':
+            from apex.optimizers import FusedAdam
+            self.optimizer = FusedAdam(parameters, eps=1e-8, betas=(0.9, 0.999), lr=self.cfg.lr, weight_decay=self.cfg.weight_decay)
+        elif opt_lower == 'fused_lamb':
+            from apex.optimizers import FusedLAMB
+            self.optimizer = FusedLAMB(parameters, eps=1e-8, betas=(0.9, 0.999), lr=self.cfg.lr, weight_decay=self.cfg.weight_decay)
+        else:
+            raise ValueError(f"Unsupported optimizer '{self.optimizer}'")
     
     def _init_scheduler(self):
         """初始化学习率调度器"""
-        # self.scheduler = torch.optim.lr_scheduler.StepLR(self.optimizer, step_size=30, gamma=0.1)
-        self.scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(self.optimizer, T_max=self.cfg.epochs, eta_min=self.cfg.lr * 0.001)
-        # self.scheduler = get_cosine_schedule_with_warmup(self.optimizer, num_warmup_steps=int(0.05*self.cfg.epochs), num_training_steps=self.cfg.epochs)
+        scheduler_lower = self.cfg.scheduler.lower()
+        if scheduler_lower == 'step':
+            self.scheduler = torch.optim.lr_scheduler.StepLR(self.optimizer, step_size=30, gamma=0.1)
+        elif scheduler_lower == 'multistep':
+            self.scheduler = torch.optim.lr_scheduler.MultiStepLR(self.optimizer, milestones=[30, 60, 90], gamma=0.1)
+        elif scheduler_lower == 'linear':
+            self.scheduler = torch.optim.lr_scheduler.LinearLR(self.optimizer, start_factor=1.0, end_factor=0.0, total_iters=self.cfg.epochs)
+        elif scheduler_lower == 'cosine':
+            self.scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(self.optimizer, T_max=self.cfg.epochs, eta_min=self.cfg.lr * 0.001)
+        elif scheduler_lower == 'cosine_warmup':
+            self.scheduler = get_cosine_schedule_with_warmup(self.optimizer, num_warmup_steps=int(0.05*self.cfg.epochs), num_training_steps=self.cfg.epochs)
+        else:
+            raise ValueError(f"Unsupported scheduler '{self.scheduler}'")
         
     def _init_dataloaders(self):
         """初始化数据加载器"""
@@ -117,7 +141,7 @@ class SceneRecognitionTrainer:
                 checkpoint = torch.load(self.cfg.resume)
                 self.optimizer.load_state_dict(checkpoint['optimizer'])
                 self.scaler.load_state_dict(checkpoint['scaler'])
-                self.cfg.start_epoch = checkpoint['epoch']
+                self.start_epoch = checkpoint['epoch']
                 self.best_prec1 = checkpoint['best_prec1']
                 self.model.load_state_dict(checkpoint['state_dict'], strict=False)
                 print(f"=> loaded checkpoint '{self.cfg.resume}' (epoch {checkpoint['epoch']})")
@@ -292,7 +316,7 @@ class SceneRecognitionTrainer:
             return
 
         # 训练循环
-        for epoch in tqdm(range(self.cfg.start_epoch, self.cfg.epochs), desc='Epoch'):
+        for epoch in tqdm(range(self.start_epoch, self.cfg.epochs), desc='Epoch'):
             # 训练一个epoch
             _train_loss, _train_prec1, _train_prec5 = self.train_epoch(epoch)
 

@@ -11,12 +11,14 @@ use_dataLoaderCache: True   # use cache for faster dataloading(but use more memo
 use_amp: False              # use automatic mixed precision
 
 arch: 'resnet18'            # model architecture in torchvision.models(e.g. resnet18, vgg, etc)
-start_epoch: 0              # start epoch
 epochs: 90                  # number of epochs to train
 
+scheduler: 'cosine'         # (cosine, cosine_warmup, step, multistep, linear)
 lr: 0.001                   # starting learning rate(finetune or transfer-learning needs small lr, e.g. 0.00001)
 batch_size: 8               # batch size
 workers: 6                  # number of data loading workers
+
+optimizer: 'adamw'          # (adamw, sgd, fused_adam, fused_lamb)
 momentum: 0.9               # momentum in Optimizer
 weight_decay: 0.001         # weight decay in Optimizer
 
