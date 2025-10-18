@@ -16,7 +16,8 @@ from transformers import AutoImageProcessor, AutoModel, AutoConfig, get_cosine_s
 
 from models import DinoV3Linear
 from models import ResNetLinear
-from models import build_swin_model, load_swin_pretrained
+from models import SwinLinear
+from models import build_swin_model
 from utils.metrics import AverageMeter, compute_accuracy
 from utils.model_statistics import detailed_model_summary
 from utils.data_loader_cache import get_places365_dataloaders_cache, get_places365_dataloaders_normal
@@ -65,9 +66,8 @@ class SceneRecognitionTrainer:
             backbone = models.__dict__[self.cfg.arch](num_classes=365) # , pretrained=True
             self.model = ResNetLinear(backbone, self.cfg.num_classes, freeze_backbone=self.cfg.use_freeze_backbone, pretrained_weights_path=self.cfg.pretrained_weights) # freze backbone
         elif model_name == 'swin':
-            self.model = build_swin_model(self.cfg)
-            MODEL_NAME_OR_PATH = self.cfg.pretrained_weights
-            load_swin_pretrained(MODEL_NAME_OR_PATH, self.model)
+            backbone = build_swin_model(self.cfg)
+            self.model = SwinLinear(backbone, self.cfg.num_classes, freeze_backbone=self.cfg.use_freeze_backbone, pretrained_weights_path=self.cfg.pretrained_weights) # freze backbone
         else:
             raise ValueError(f"Unsupported architecture '{self.cfg.arch}'")
 
@@ -160,17 +160,16 @@ class SceneRecognitionTrainer:
                 
     def log_model_summary(self):
         """记录模型摘要信息"""
-        # # 将模型结构写入TensorBoard
-        # try:
-        #     if not self.cfg.arch.lower().startswith('swin'):
-        #         sample_input = torch.randn(1, 3, self.cfg.img_size, self.cfg.img_size).to(self.device)
-        #         self.writer.add_graph(self.model, sample_input)
-        # except Exception as e:
-        #     print(f"Could not add model graph to TensorBoard: {str(e)}")
-
-        # # 打印模型统计参数
-        # detailed_model_summary(self.model, (1, 3, self.cfg.img_size, self.cfg.img_size))
-        pass
+        # 将模型结构写入TensorBoard
+        try:
+            if not self.cfg.arch.lower().startswith('swin'):
+                sample_input = torch.randn(1, 3, self.cfg.img_size, self.cfg.img_size).to(self.device)
+                self.writer.add_graph(self.model, sample_input)
+                
+        except Exception as e:
+            print(f"Could not add model graph to TensorBoard: {str(e)}")
+        # 打印模型统计参数
+        detailed_model_summary(self.model, (1, 3, self.cfg.img_size, self.cfg.img_size))
         
     def train_epoch(self, epoch):
         """训练一个epoch"""
@@ -221,7 +220,7 @@ class SceneRecognitionTrainer:
                 'Time': f'{batch_time.val:.3f}({batch_time.avg:.3f})',
                 'Data': f'{data_time.val:.3f}({data_time.avg:.3f})',
                 'Loss': f'{losses.val:.4f}({losses.avg:.4f})',
-                'LR': f'{current_lr:.5f}',
+                'LR': f'{current_lr:.6f}',
                 'Prec@1': f'{top1.val:06.3f}({top1.avg:06.3f})',
                 'Prec@5': f'{top5.val:06.3f}({top5.avg:06.3f})'
             }

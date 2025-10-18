@@ -65,6 +65,6 @@ class DinoV3Linear(nn.Module):
 
         # # 4.分类头扩展（多层感知机处理所有tokens）
         # flattened = last_hidden.view(last_hidden.size(0), -1)  # [batch_size, 201*384]
-        # logits = self.head(flattened)
+        # logits = self.head_flatten(flattened)
 
         return logits
