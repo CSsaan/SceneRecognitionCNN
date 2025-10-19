@@ -31,21 +31,22 @@ class DinoV3Linear(nn.Module):
         
         self.aggregator = AttentionAggregator(hidden_size)
 
-        self.head = nn.Sequential(
-            nn.Linear(hidden_size, 1024),
-            nn.ReLU(inplace=True),
-            nn.Dropout(p=0.1),
-            nn.Linear(1024, num_classes)
-        )
-        self.head_flatten = nn.Sequential(
-            nn.Linear(201 * 384, 1024),  # 展平所有tokens
-            nn.ReLU(inplace=True),
-            nn.Dropout(p=0.1),
-            nn.Linear(1024, 512),
-            nn.ReLU(inplace=True),
-            nn.Dropout(p=0.1),
-            nn.Linear(512, num_classes)
-        )
+        self.head = nn.Linear(hidden_size, num_classes)
+        # self.head = nn.Sequential(
+        #     nn.Linear(hidden_size, 1024),
+        #     nn.ReLU(inplace=True),
+        #     nn.Dropout(p=0.1),
+        #     nn.Linear(1024, num_classes)
+        # )
+        # self.head_flatten = nn.Sequential(
+        #     nn.Linear(201 * 384, 1024),  # 展平所有tokens
+        #     nn.ReLU(inplace=True),
+        #     nn.Dropout(p=0.1),
+        #     nn.Linear(1024, 512),
+        #     nn.ReLU(inplace=True),
+        #     nn.Dropout(p=0.1),
+        #     nn.Linear(512, num_classes)
+        # )
     def forward(self, pixel_values):
         outputs = self.backbone(pixel_values=pixel_values)
         last_hidden = outputs.last_hidden_state # [B, 201, 384]

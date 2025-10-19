@@ -153,7 +153,7 @@ if __name__ == "__main__":
     )
     print("ONNX 动态量化完成！")
 
-    # TODO: 静态量化
+    # 静态量化
     model_quant_static = f'{output_path}/{arch}_quant_static.onnx'
     img_dir = r'D:\CS\MyProjects\resources\Datasets\CUB_200_2011\train\002.Laysan_Albatross'
     img_num = 48

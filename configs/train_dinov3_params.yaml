@@ -1,7 +1,7 @@
-num_classes: 200            # number of classes
+num_classes: 365            # number of classes
 img_size: 224               # input image size
 
-dataset_dir: '../Datasets/CUB_200_2011'                          # '../Datasets/places365standard_easyformat/places365_standard'     '../Datasets/CUB_200_2011'
+dataset_dir: '../Datasets/places365standard_easyformat/places365_standard' # '../Datasets/places365standard_easyformat/places365_standard'  '../Datasets/CUB_200_2011'
 
 pretrained_weights: './checkpoints/weights/dinov3-vits16-pretrain-lvd1689m' # path to pretrained weights
 resume: ''                                                       # Checkpoint resuming | path to latest checkpoint (default: None)
@@ -15,8 +15,8 @@ epochs: 90                  # number of epochs to train
 
 scheduler: 'cosine'         # (cosine, cosine_warmup, step, multistep, linear)
 lr: 0.0001                   # starting learning rate(finetune or transfer-learning needs small lr, e.g. 0.00001)
-batch_size: 128               # batch size
-workers: 6                  # number of data loading workers
+batch_size: 128              # batch size
+workers: 8                  # number of data loading workers
 
 optimizer: 'adamw'          # (adamw, sgd, fused_adam, fused_lamb)
 momentum: 0.9               # momentum in Optimizer

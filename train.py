@@ -14,10 +14,6 @@ from torch.utils.tensorboard import SummaryWriter
 import torchvision.models as models
 from transformers import AutoImageProcessor, AutoModel, AutoConfig, get_cosine_schedule_with_warmup
 
-from models import DinoV3Linear
-from models import ResNetLinear
-from models import SwinLinear
-from models import build_swin_model
 from utils.metrics import AverageMeter, compute_accuracy
 from utils.model_statistics import detailed_model_summary
 from utils.data_loader_cache import get_places365_dataloaders_cache, get_places365_dataloaders_normal
@@ -59,13 +55,17 @@ class SceneRecognitionTrainer:
         print(f"[Creating model '{self.cfg.arch}']")
         model_name = self.cfg.arch.lower()
         if model_name == 'dinov3':
+            from models import DinoV3Linear
             MODEL_NAME_OR_PATH = self.cfg.pretrained_weights # "./checkpoints/weights/dinov3-vits16-pretrain-lvd1689m"
             backbone = AutoModel.from_pretrained(MODEL_NAME_OR_PATH)
             self.model = DinoV3Linear(backbone, self.cfg.num_classes, freeze_backbone=self.cfg.use_freeze_backbone) # freze backbone
         elif model_name.startswith('resnet') or model_name.startswith('vgg'):
+            from models import ResNetLinear
             backbone = models.__dict__[self.cfg.arch](num_classes=365) # , pretrained=True
             self.model = ResNetLinear(backbone, self.cfg.num_classes, freeze_backbone=self.cfg.use_freeze_backbone, pretrained_weights_path=self.cfg.pretrained_weights) # freze backbone
         elif model_name == 'swin':
+            from models import SwinLinear
+            from models.swin_transformer import build_model as build_swin_model
             backbone = build_swin_model(self.cfg)
             self.model = SwinLinear(backbone, self.cfg.num_classes, freeze_backbone=self.cfg.use_freeze_backbone, pretrained_weights_path=self.cfg.pretrained_weights) # freze backbone
         else:
@@ -361,7 +361,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
 
     # train_resnet18_params.yaml | train_dinov3_params.yaml | train_swin_params.yaml
-    parser.add_argument('--cfg', type=str, default='configs/train_resnet18_params.yaml')
+    parser.add_argument('--cfg', type=str, default='configs/train_dinov3_params.yaml')
 
     args = parser.parse_args()
     cfg = argparse.Namespace(**yaml.load(open(args.cfg), Loader=yaml.SafeLoader))

@@ -206,7 +206,9 @@ def get_places365_dataloaders_cache(data_path, batch_size=32, workers=4, cache_s
         batch_size=batch_size, 
         shuffle=True,
         num_workers=workers, 
-        pin_memory=True
+        pin_memory=torch.cuda.is_available(),
+        prefetch_factor=2,
+        drop_last=True
     )
     
     val_loader = DataLoader(
@@ -214,7 +216,7 @@ def get_places365_dataloaders_cache(data_path, batch_size=32, workers=4, cache_s
         batch_size=batch_size, 
         shuffle=False,
         num_workers=workers, 
-        pin_memory=True
+        pin_memory=torch.cuda.is_available()
     )
     
     return train_loader, val_loader
@@ -236,7 +238,7 @@ def get_places365_dataloaders_normal(data_path, batch_size=32, workers=4, cache_
         transforms.ToTensor(),
         normalize]))
     
-    train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=workers, pin_memory=torch.cuda.is_available(), drop_last=True)
+    train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=workers, pin_memory=torch.cuda.is_available(), prefetch_factor=2, drop_last=True)
     val_loader = torch.utils.data.DataLoader(val_dataset, batch_size=batch_size, shuffle=False, num_workers=workers, pin_memory=torch.cuda.is_available())
 
     return train_loader, val_loader
