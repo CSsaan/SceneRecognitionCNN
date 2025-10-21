@@ -512,3 +512,267 @@ Places365-Challenge | 8,026,628 | 36,500 | 328,500
 ## 人类动作识别
 
 [UCF系列](https://www.crcv.ucf.edu/data/UCF101.php)。UCF101是由美国中佛罗里达大学计算机视觉研究中心创建的大型人类动作数据集，包含101种动作类别，共13320个视频片段，总时长约27小时。数据集内容丰富，涵盖了体育、乐器演奏、人类互动等多种场景，视频来源于YouTube，具有真实环境下的摄像头移动和复杂背景。创建过程中，研究人员从YouTube下载视频，手动筛选去除无关内容，确保数据集的质量。UCF101主要用于动作识别研究，旨在解决复杂环境下的动作分类问题，是目前最具挑战性的动作识别数据集之一。
+
+## AI剪辑中的场景识别设想
+
+### 1. 按拍摄环境和剪辑用途分类
+
+- **人物对话场景**
+  - 室内对话：客厅、办公室、咖啡厅、餐厅等
+  - 室外对话：公园、街道、阳台等
+  
+- **独白/旁白场景**
+  - 室内独处：卧室、书房、浴室等私密空间
+  - 室外沉思：海边、山顶、花园等开阔环境
+
+- **动作/情节场景**
+  - 运动场景：体育馆、运动场、健身房等
+  - 工作场景：厨房、工作室、办公区等
+  - 交通工具：汽车内、火车、飞机等
+
+- **过渡/空镜头场景**
+  - 自然风光：山水、森林、海洋、天空等
+  - 城市景观：街道、建筑、夜景等
+  - 细节特写：花草、物品等特写镜头
+
+- **社交聚会场景**
+  - 庆祝场所：宴会厅、酒吧、派对场地等
+  - 公共场所：商场、广场、公园等人群聚集地
+
+- **特殊情境场景**
+  - 医疗场景：医院、诊所等
+  - 教育场景：教室、图书馆等
+  - 紧急情况：火灾、事故现场等(如果适用)
+
+### 2. 按镜头语言和视觉风格分类
+
+- **静态场景**：适合长镜头、固定镜头的安静场景
+- **动态场景**：适合快切、运动镜头的活跃场景
+- **情感场景**：能传达特定情绪的场景(温馨、紧张、浪漫等)
+- **展示场景**：用于产品展示、环境介绍的场景
+
+## 实施策略
+
+### 分类层次设计
+
+``` text
+主分类 (6-8类) → 子分类 (15-20类) → 原始类别 (365类)
+```
+
+## 主分类体系
+
+### 1. 居住与生活空间 (Living & Lifestyle)
+
+- **私人居住空间**
+  - bedroom 卧室
+  - bedchamber 卧室
+  - living_room 客厅
+  - childs_room 儿童房
+  - attic 阁楼
+  - basement 地下室
+  - closet 壁橱
+  - dressing_room 更衣室
+  - bathroom 浴室
+  - shower 淋浴
+  - jacuzzi/indoor 按摩浴缸/室内
+
+- **共享居住设施**
+  - dorm_room 宿舍
+  - apartment_building/outdoor 公寓楼/户外
+  - house 屋
+  - cottage 小屋
+  - mansion 大厦
+  - manufactured_home 预制房屋
+  - ranch_house 牧场屋
+  - chalet 小木屋
+
+- **生活服务场所**
+  - kitchen 厨房
+  - dining_room 饭厅
+  - dining_hall 餐厅
+  - cafeteria 自助餐厅
+  - diner/outdoor 晚餐/户外
+  - restaurant 餐厅
+  - restaurant_kitchen 餐厅厨房
+  - restaurant_patio 餐厅露台
+  - coffee_shop 咖啡馆
+  - bakery/shop 面包店/商店
+  - ice_cream_parlor 冰淇淋店
+  - bar 酒吧
+  - pub/indoor 酒吧/室内
+  - beer_garden 啤酒花园
+  - beer_hall 啤酒馆
+  - banquet_hall 宴会厅
+
+### 2. 工作与学习场所 (Work & Education)
+
+- **办公场所**
+  - office 办公室
+  - office_building 办公楼
+  - office_cubicles 办公室隔间
+  - home_office 家庭办公室
+  - conference_center 会议中心
+  - conference_room 会议室
+  - meeting_room 会议室
+
+- **教育机构**
+  - classroom 课堂
+  - lecture_room 演讲厅
+  - schoolhouse 校舍
+  - campus 校园
+  - library/indoor 图书馆/室内
+  - library/outdoor 图书馆/户外
+  - kindergarden_classroom 幼儿园教室
+
+- **专业工作场所**
+  - laboratory 实验室 (biology_laboratory, chemistry_lab, physics_laboratory)
+  - studio 工作室 (art_studio, music_studio, portrait_studio)
+  - workshop 工作坊 (engine_room, repair_shop, assembly_line)
+  - medical_facility 医疗场所 (hospital, hospital_room, operating_room)
+  - computer_room 计算机房
+  - server_room 服务器机房
+
+### 3. 商业与服务设施 (Commercial & Services)
+
+- **零售商业**
+  - store 商店 (general_store/indoor, general_store/outdoor)
+  - specialty_shops 专业店 (butchers_shop, candy_store, clothing_store, fabric_store, florist_shop/indoor, florist_shop/outdoor, jewelry_shop, pet_shop, pharmacy, shoe_shop, toyshop, electronics_store, bookstore, gift_shop)
+  - department_store 百货商店
+  - shopping_mall/indoor 商场/室内
+  - market 市场 (market/indoor, market/outdoor, flea_market/indoor, bazaar/indoor, bazaar/outdoor)
+  - auto_showroom 自动陈列室
+
+- **餐饮服务**
+  - fastfood_restaurant 快餐餐厅
+  - food_court 美食广场
+  - delicatessen 熟食
+
+- **其他服务**
+  - beauty_salon 美容院
+  - laundromat 自助洗衣店
+  - gas_station 加油站
+  - parking_garage 停车库 (indoor/outdoor)
+  - parking_lot 停车场
+
+### 4. 娱乐与休闲场所 (Entertainment & Recreation)
+
+- **文化娱乐**
+  - theater 剧院 (movie_theater/indoor, amphitheater)
+  - art_gallery 艺术画廊
+  - museum 博物馆 (art_museum, natural_history_museum, science_museum)
+  - auditorium 礼堂
+  - concert_hall 音乐厅
+
+- **体育运动**
+  - gymnasium/indoor 健身房/室内
+  - sports_courts 运动场 (basketball_court/indoor, tennis_court/indoor, badminton_court/indoor, squash_court, volleyball_court/indoor)
+  - sports_fields 运动场 (athletic_field/outdoor, baseball_field, football_field, soccer_field)
+  - swimming_pool 游泳池 (indoor/outdoor)
+  - golf_course 高尔夫球场
+  - bowling_alley 保龄球馆
+  - boxing_ring 拳赛场地
+
+- **游乐休闲**
+  - amusement_park 游乐园
+  - amusement_arcade 游戏室
+  - playground 游乐场
+  - arcade 拱廊
+  - botanical_garden 植物园
+  - garden 花园 (formal_garden, japanese_garden, topiary_garden, zen_garden)
+  - zoo 动物园 (虽然未在列表中，但可归入此类)
+
+### 5. 交通与运输设施 (Transportation)
+
+- **航空运输**
+  - airfield 机场
+  - airport_terminal 机场航站楼
+  - airplane_cabin 飞机舱
+
+- **陆路交通**
+  - road 道路 (highway, street, alley, driveway, field_road, desert_road)
+  - railway 铁路 (railroad_track, train_station/platform, train_interior)
+  - bus_station 公交车站/室内
+  - bus_interior 巴士内部
+  - subway 地铁 (subway_station/platform, subway_interior)
+  - parking 设施 (parking_garage, parking_lot)
+  - toll_plaza 收费站
+
+- **水上交通**
+  - harbor 海港
+  - boat_deck 船甲板
+  - boathouse 船库
+
+### 6. 宗教与政府建筑 (Religious & Government)
+
+- **宗教场所**
+  - church 教堂 (church/indoor, church/outdoor)
+  - mosque 清真寺 (mosque/outdoor)
+  - synagogue 犹太教堂 (synagogue/indoor, synagogue/outdoor)
+  - temple 寺庙 (虽然未在列表中，但可归入此类)
+
+- **政府机构**
+  - courthouse 法院大楼
+  - legislative_chamber 立法会议厅
+  - city_building 市政建筑 (capitol_building虽然未在列表中)
+  - embassy 大使馆
+
+### 7. 自然与户外环境 (Nature & Outdoor)
+
+- **自然景观**
+  - mountain 山 (mountain, mountain_path, mountain_snowy)
+  - forest 森林 (forest/broadleaf, forest_path, forest_road)
+  - water_bodies 水体 (ocean, sea, lake/natural, river, creek, pond, waterfall, fountain, swimming_hole)
+  - desert 沙漠 (desert/sand, desert/vegetation)
+  - canyon 峡谷
+  - glacier 冰川
+  - volcano 火山
+  - field 田野 (field/cultivated, field/wild, corn_field, hayfield, rice_paddy, wheat_field, pasture)
+  - beach 海滩
+  - sky 天空
+  - garden 花园 (botanical_garden, formal_garden, japanese_garden, topiary_garden, zen_garden, vegetable_garden)
+
+- **户外休闲**
+  - park 公园
+  - campsite 营地
+  - picnic_area 野餐区
+  - patio 露台
+  - courtyard 庭院
+  - plaza 广场
+  - downtown 市中心
+  - residential_neighborhood 居民区
+
+### 8. 特殊用途场所 (Special Purpose)
+
+- **工业设施**
+  - factory 工厂 (auto_factory, cheese_factory)
+  - industrial_area 工业区
+  - construction_site 施工现场
+  - power_plant 发电厂 (nuclear_power_plant/outdoor)
+  - oil_refinery 炼油厂/outdoor
+  - warehouse/indoor 仓库/室内
+
+- **军事与安全**
+  - army_base 军队基地
+  - jail 监狱 (jail_cell, jail/indoor)
+  - firing_range/indoor 射程/室内
+
+- **其他特殊场所**
+  - barn 谷仓
+  - castle 城堡
+  - catacomb 地下墓穴
+  - cemetery 公墓
+  - dam 坝
+  - landfill 垃圾填埋场
+  - junkyard 垃圾场
+  - lighthouse 灯塔
+  - observatory/outdoor 天文台/户外
+  - viaduct 高架桥
+  - windmill 风车
+  - wind_farm 风电场
+
+这种分类方式可以帮助AI剪辑系统根据场景类型选择合适的剪辑策略，例如：
+
+- 居住空间场景适合温馨、私密的剪辑风格
+- 工作场所场景适合专业、高效的剪辑节奏
+- 娱乐休闲场景适合活泼、有趣的剪辑方式
+- 自然景观场景适合舒缓、优美的剪辑节奏

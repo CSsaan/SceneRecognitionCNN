@@ -118,7 +118,7 @@ class Places365CacheDataset(Dataset):
         print("Loading all cached data to memory...")
         self.cached_data = []
         for cache_path in tqdm(self.dataset["cache_paths"]):
-            data = torch.load(cache_path)
+            data = torch.load(cache_path, map_location='cpu')
             self.cached_data.append(data)
         print(f"Loaded {len(self.cached_data)} items to memory")
     
