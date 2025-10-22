@@ -7,7 +7,7 @@ pretrained_weights: './checkpoints/weights/swin/swin_tiny_patch4_window7_224.pth
 resume: ''                                                       # Checkpoint resuming | path to latest checkpoint (default: None)
 
 use_freeze_backbone: True  # freeze backbone when transfer-learning
-use_dataLoaderCache: True   # use cache for faster dataloading(but use more memory)
+use_dataLoaderCache: False  # use cache for faster dataloading(but use more memory)
 use_amp: False              # use automatic mixed precision
 
 arch: 'swin'                # (swin, swinv2, swin_moe, swin_mlp)

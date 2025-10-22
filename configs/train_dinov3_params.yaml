@@ -4,18 +4,20 @@ img_size: 224               # input image size
 dataset_dir: '../Datasets/places365standard_easyformat/places365_standard' # '../Datasets/places365standard_easyformat/places365_standard'  '../Datasets/CUB_200_2011'
 
 pretrained_weights: './checkpoints/weights/dinov3-vits16-pretrain-lvd1689m' # path to pretrained weights
-resume: ''                                                       # Checkpoint resuming | path to latest checkpoint (default: None)
+resume: '' # Checkpoint resuming | path to latest checkpoint (default: None)
 
 use_freeze_backbone: True  # freeze backbone when transfer-learning
-use_dataLoaderCache: False   # use cache for faster dataloading(but use more memory)
-use_amp: False              # use automatic mixed precision
+use_dataLoaderCache: False # use cache for faster dataloading(but use more memory)
+use_amp: True              # use automatic mixed precision
+use_DDP: True              # use Distributed Data Parallel
+GPUs: '0,1'                # GPU IDs for DDP
 
 arch: 'dinov3'              # model architecture in torchvision.models(e.g. resnet18, dinov3, etc)
 epochs: 60                  # number of epochs to train
 
 scheduler: 'cosine'         # (cosine, cosine_warmup, step, multistep, linear)
-lr: 0.00001                   # starting learning rate(finetune or transfer-learning needs small lr, e.g. 0.00001)
-batch_size: 16              # batch size
+lr: 0.00001                 # starting learning rate(finetune or transfer-learning needs small lr, e.g. 0.00001)
+batch_size: 128             # batch size
 workers: 8                  # number of data loading workers
 
 optimizer: 'adamw'          # (adamw, sgd, fused_adam, fused_lamb)

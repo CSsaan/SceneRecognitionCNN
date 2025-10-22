@@ -149,7 +149,8 @@ class Places365CacheDataset(Dataset):
         
         return image_tensor, label
 
-def get_places365_dataloaders_cache(data_path, batch_size=32, workers=4, cache_size=[224, 224], cache_boost=False):
+def get_places365_dataloaders_cache(data_path, batch_size=32, workers=4, cache_size=[224, 224], cache_boost=False, 
+                                    use_distributed=False, rank=0, world_size=1):
     """
     创建带缓存的Places365数据加载器
     
@@ -199,6 +200,19 @@ def get_places365_dataloaders_cache(data_path, batch_size=32, workers=4, cache_s
         cache_path=os.path.abspath(os.path.join(data_path, 'cache', 'val')),
         cache_boost=cache_boost
     )
+
+    train_sampler, val_sampler = None, None
+    if use_distributed:
+        train_sampler = torch.utils.data.distributed.DistributedSampler(
+            train_dataset, 
+            num_replicas=world_size, 
+            rank=rank
+        )
+        val_sampler = torch.utils.data.distributed.DistributedSampler(
+            val_dataset, 
+            num_replicas=world_size, 
+            rank=rank
+        )
     
     # 创建数据加载器
     train_loader = DataLoader(
@@ -207,7 +221,8 @@ def get_places365_dataloaders_cache(data_path, batch_size=32, workers=4, cache_s
         shuffle=True,
         num_workers=workers, 
         pin_memory=torch.cuda.is_available(),
-        prefetch_factor=2,
+        sampler=train_sampler,
+        persistent_workers=True,
         drop_last=True
     )
     
@@ -216,13 +231,16 @@ def get_places365_dataloaders_cache(data_path, batch_size=32, workers=4, cache_s
         batch_size=batch_size, 
         shuffle=False,
         num_workers=workers, 
-        pin_memory=torch.cuda.is_available()
+        pin_memory=torch.cuda.is_available(),
+        sampler=val_sampler,
+        persistent_workers=True
     )
     
     return train_loader, val_loader
 
 
-def get_places365_dataloaders_normal(data_path, batch_size=32, workers=4, cache_size=[224, 224]):
+def get_places365_dataloaders_normal(data_path, batch_size=32, workers=4, cache_size=[224, 224], use_distributed=False, 
+                                     rank=0, world_size=1):
     traindir = os.path.join(data_path, 'train')
     valdir = os.path.join(data_path, 'val')
 
@@ -237,9 +255,24 @@ def get_places365_dataloaders_normal(data_path, batch_size=32, workers=4, cache_
         transforms.CenterCrop(cache_size[0]),
         transforms.ToTensor(),
         normalize]))
+
+    train_sampler, val_sampler = None, None
+    if use_distributed:
+        train_sampler = torch.utils.data.distributed.DistributedSampler(
+            train_dataset, 
+            num_replicas=world_size, 
+            rank=rank,
+            shuffle=True
+        )
+        val_sampler = torch.utils.data.distributed.DistributedSampler(
+            val_dataset, 
+            num_replicas=world_size, 
+            rank=rank,
+            shuffle=False
+        )
     
-    train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=workers, pin_memory=torch.cuda.is_available(), prefetch_factor=2, drop_last=True)
-    val_loader = torch.utils.data.DataLoader(val_dataset, batch_size=batch_size, shuffle=False, num_workers=workers, pin_memory=torch.cuda.is_available())
+    train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=batch_size, shuffle=not use_distributed, num_workers=workers, pin_memory=True, sampler=train_sampler, drop_last=True)
+    val_loader = torch.utils.data.DataLoader(val_dataset, batch_size=batch_size, shuffle=False, num_workers=workers, pin_memory=True, sampler=val_sampler)
 
     return train_loader, val_loader
 

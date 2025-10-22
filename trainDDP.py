@@ -14,11 +14,28 @@ from torch.utils.tensorboard import SummaryWriter
 import torchvision.models as models
 from transformers import AutoImageProcessor, AutoModel, AutoConfig, get_cosine_schedule_with_warmup
 
+import torch.distributed as dist
+import torch.multiprocessing as mp
+from torch.nn.parallel import DistributedDataParallel as DDP
+
 from utils.metrics import AverageMeter, compute_accuracy
 from utils.model_statistics import detailed_model_summary
 from utils.data_loader_cache import get_places365_dataloaders_cache, get_places365_dataloaders_normal
 
 
+def setup(rank, world_size):
+    """设置分布式训练环境"""
+    os.environ['MASTER_ADDR'] = 'localhost'
+    os.environ['MASTER_PORT'] = '12355'
+    os.environ['WORLD_SIZE'] = str(world_size)
+    # 初始化进程组
+    dist.init_process_group("nccl", rank=rank, world_size=world_size)
+    torch.cuda.set_device(rank)
+
+def cleanup():
+    """清理分布式训练环境"""
+    dist.destroy_process_group()
+    
 def seed_all(seed: int):
     random.seed(seed)
     np.random.seed(seed)
@@ -33,16 +50,27 @@ class SceneRecognitionTrainer:
         self.cfg = config
         self.start_epoch = 0
         self.best_prec1 = 0
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+        self.rank = dist.get_rank() if dist.is_initialized() else 0
+        pid = os.getpid()
+        print(f'current pid: {pid}')
+        print(f'Current rank {self.rank}')
+        device_id = self.rank % torch.cuda.device_count()
+
+        self.device = torch.device(f"cuda:{device_id}" if torch.cuda.is_available() else "cpu")
         self.scaler = torch.amp.GradScaler(enabled=torch.cuda.is_available() and config.use_amp)
+
 
         torch.backends.cudnn.benchmark = True
         torch.backends.cudnn.enabled = True
         
-        # 初始化TensorBoard writer
-        current_time = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
-        self.writer = SummaryWriter(log_dir=f'runs/places365_{current_time}')
-        
+        # 只在rank 0上初始化TensorBoard writer
+        if self.rank == 0:
+            current_time = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+            self.writer = SummaryWriter(log_dir=f'runs/places365_{current_time}')
+        else:
+            self.writer = None
+
         # 初始化模型、优化器和学习率调度器
         self._init_model()
         self._init_optimizer()
@@ -75,15 +103,10 @@ class SceneRecognitionTrainer:
         else:
             raise ValueError(f"Unsupported architecture '{self.cfg.arch}'")
 
-        # DataParallel
-        device_ids = list(range(torch.cuda.device_count())) # device_ids=[0,1,2]
-        print(f"正在使用 {torch.cuda.device_count()} 个 GPU 进行训练！")
-        if self.cfg.arch.lower().startswith('alexnet') or self.cfg.arch.lower().startswith('vgg'):
-            self.model.features = nn.DataParallel(self.model.features, device_ids=device_ids)
-        elif torch.cuda.is_available() and torch.cuda.device_count() > 1:
-            self.model = nn.DataParallel(self.model, device_ids=device_ids)
-            
+        # 使用DDP包装模型而不是DataParallel
         self.model.to(self.device)
+        if self.cfg.use_DDP:
+            self.model = DDP(self.model, device_ids=[self.rank], find_unused_parameters=True)
     
     def _init_optimizer(self):
         """初始化优化器"""
@@ -101,7 +124,7 @@ class SceneRecognitionTrainer:
             from apex.optimizers import FusedLAMB
             self.optimizer = FusedLAMB(parameters, eps=1e-8, betas=(0.9, 0.999), lr=self.cfg.lr, weight_decay=self.cfg.weight_decay)
         else:
-            raise ValueError(f"Unsupported optimizer '{self.optimizer}'")
+            raise ValueError(f"Unsupported optimizer '{self.cfg.optimizer}'")
     
     def _init_scheduler(self):
         """初始化学习率调度器"""
@@ -117,7 +140,7 @@ class SceneRecognitionTrainer:
         elif scheduler_lower == 'cosine_warmup':
             self.scheduler = get_cosine_schedule_with_warmup(self.optimizer, num_warmup_steps=int(0.05*self.cfg.epochs), num_training_steps=self.cfg.epochs)
         else:
-            raise ValueError(f"Unsupported scheduler '{self.scheduler}'")
+            raise ValueError(f"Unsupported scheduler '{self.cfg.scheduler}'")
         
     def _init_dataloaders(self):
         """初始化数据加载器"""
@@ -127,16 +150,23 @@ class SceneRecognitionTrainer:
                 batch_size=self.cfg.batch_size,
                 workers=self.cfg.workers,
                 cache_size=[self.cfg.img_size, self.cfg.img_size],
-                cache_boost=False
+                cache_boost=False,
+                use_distributed=self.cfg.use_DDP,
+                rank=self.rank,
+                world_size=self.cfg.world_size
             )
         else:
             self.train_loader, self.val_loader = get_places365_dataloaders_normal(
                 data_path=self.cfg.dataset_dir,
                 batch_size=self.cfg.batch_size,
                 workers=self.cfg.workers,
-                cache_size=[self.cfg.img_size, self.cfg.img_size]
+                cache_size=[self.cfg.img_size, self.cfg.img_size],
+                use_distributed=self.cfg.use_DDP,
+                rank=self.rank,
+                world_size=self.cfg.world_size
             )
-        print(f"[Using {len(self.train_loader)} batches for training, {len(self.val_loader)} for validation]")
+        if self.rank == 0:
+            print(f"[Using {len(self.train_loader)} batches for training, {len(self.val_loader)} for validation]")
 
     def _init_criterion(self):
         """初始化损失函数"""
@@ -164,6 +194,8 @@ class SceneRecognitionTrainer:
                 
     def log_model_summary(self):
         """记录模型摘要信息"""
+        if self.cfg.use_DDP:
+            return
         # 将模型结构写入TensorBoard
         try:
             if not self.cfg.arch.lower().startswith('swin'):
@@ -177,6 +209,10 @@ class SceneRecognitionTrainer:
         
     def train_epoch(self, epoch):
         """训练一个epoch"""
+        # 设置sampler的epoch以确保每个epoch的shuffle不同
+        if self.cfg.use_DDP and hasattr(self.train_loader, 'sampler'):
+            self.train_loader.sampler.set_epoch(epoch)
+
         batch_time = AverageMeter()
         data_time = AverageMeter()
         losses = AverageMeter()
@@ -187,7 +223,10 @@ class SceneRecognitionTrainer:
         self.model.train()
 
         end = time.time()
-        pbar_batch = tqdm(self.train_loader, desc='Training')
+        if self.rank == 0:  # 只在rank 0上显示进度条
+            pbar_batch = tqdm(self.train_loader, desc='Training')
+        else:
+            pbar_batch = self.train_loader
         for i, (input, target) in enumerate(pbar_batch):
             # measure data loading time
             data_time.update(time.time() - end)
@@ -204,9 +243,20 @@ class SceneRecognitionTrainer:
 
             # measure accuracy and record loss
             prec1, prec5 = compute_accuracy(output.data, target, topk=(1, 5))
-            losses.update(loss.item(), input.size(0))
-            top1.update(prec1, input.size(0))
-            top5.update(prec5, input.size(0))
+
+            # reduce loss & accuracy
+            if self.cfg.use_DDP:
+                reduced_loss = self._reduce_tensor(loss.item())
+                reduced_top1 = self._reduce_tensor(prec1)
+                reduced_top5 = self._reduce_tensor(prec5)
+            else:
+                reduced_loss = loss.item()
+                reduced_top1 = prec1
+                reduced_top5 = prec5
+
+            losses.update(reduced_loss, input.size(0))
+            top1.update(reduced_top1, input.size(0))
+            top5.update(reduced_top5, input.size(0))
 
             # compute gradient and do SGD step
             self.scaler.scale(loss).backward()
@@ -217,29 +267,35 @@ class SceneRecognitionTrainer:
             batch_time.update(time.time() - end)
             end = time.time()
             
-            # 显示进度信息
-            current_lr = self.optimizer.param_groups[0]['lr']
-            postfix = {
-                'Epoch': f'[{epoch}][{i}/{len(self.train_loader)}]',
-                'Time': f'{batch_time.val:.3f}({batch_time.avg:.3f})',
-                'Data': f'{data_time.val:.3f}({data_time.avg:.3f})',
-                'Loss': f'{losses.val:.4f}({losses.avg:.4f})',
-                'LR': f'{current_lr:.6f}',
-                'Prec@1': f'{top1.val:06.3f}({top1.avg:06.3f})',
-                'Prec@5': f'{top5.val:06.3f}({top5.avg:06.3f})'
-            }
-            pbar_batch.set_postfix(postfix) 
+            # 显示进度信息 (只在rank 0上)
+            if self.rank == 0:
+                current_lr = self.optimizer.param_groups[0]['lr']
+                postfix = {
+                    'Epoch': f'[{epoch}][{i}/{len(self.train_loader)}]',
+                    'Time': f'{batch_time.val:.3f}({batch_time.avg:.3f})',
+                    'Data': f'{data_time.val:.3f}({data_time.avg:.3f})',
+                    'Loss': f'{losses.val:.4f}({losses.avg:.4f})',
+                    'LR': f'{current_lr:.6f}',
+                    'Prec@1': f'{top1.val:06.3f}({top1.avg:06.3f})',
+                    'Prec@5': f'{top5.val:06.3f}({top5.avg:06.3f})'
+                }
+                pbar_batch.set_postfix(postfix) 
         
-        # 将训练指标写入TensorBoard
-        self.writer.add_scalar('Train/Loss', losses.avg, epoch)
-        self.writer.add_scalar('Train/Prec@1', top1.avg, epoch)
-        self.writer.add_scalar('Train/Prec@5', top5.avg, epoch)
-        self.writer.add_scalar('Train/Learning_Rate', current_lr, epoch)
+        # 将训练指标写入TensorBoard (只在rank 0上)
+        if self.rank == 0 and self.writer is not None:
+            self.writer.add_scalar('Train/Loss', losses.avg, epoch)
+            self.writer.add_scalar('Train/Prec@1', top1.avg, epoch)
+            self.writer.add_scalar('Train/Prec@5', top5.avg, epoch)
+            self.writer.add_scalar('Train/Learning_Rate', self.optimizer.param_groups[0]['lr'], epoch)
         
         return losses.avg, top1.avg, top5.avg
 
     def validate(self, epoch):
         """验证模型"""
+        # 设置sampler的epoch
+        if self.cfg.use_DDP and hasattr(self.val_loader, 'sampler'):
+            self.val_loader.sampler.set_epoch(epoch)
+
         batch_time = AverageMeter()
         losses = AverageMeter()
         top1 = AverageMeter()
@@ -250,7 +306,10 @@ class SceneRecognitionTrainer:
 
         end = time.time()
         with torch.no_grad():
-            pbar_batch = tqdm(self.val_loader, desc='Validating')
+            if self.rank == 0:  # 只在rank 0上显示进度条
+                pbar_batch = tqdm(self.val_loader, desc='Validating')
+            else:
+                pbar_batch = self.val_loader
             for i, (input, target) in enumerate(pbar_batch):
                 input = input.to(self.device, non_blocking=True)
                 target = target.to(self.device, non_blocking=True)
@@ -261,34 +320,55 @@ class SceneRecognitionTrainer:
 
                 # measure accuracy and record loss
                 prec1, prec5 = compute_accuracy(output.data, target, topk=(1, 5))
-                losses.update(loss.item(), input.size(0))
-                top1.update(prec1, input.size(0))
-                top5.update(prec5, input.size(0))
+
+                # reduce loss & accuracy
+                if self.cfg.use_DDP:
+                    reduced_loss = self._reduce_tensor(loss.item())
+                    reduced_top1 = self._reduce_tensor(prec1)
+                    reduced_top5 = self._reduce_tensor(prec5)
+                else:
+                    reduced_loss = loss.item()
+                    reduced_top1 = prec1
+                    reduced_top5 = prec5
+
+                losses.update(reduced_loss, input.size(0))
+                top1.update(reduced_top1, input.size(0))
+                top5.update(reduced_top5, input.size(0))
 
                 # measure elapsed time
                 batch_time.update(time.time() - end)
                 end = time.time()
 
-                postfix = {
-                    'Test': f'[{i}/{len(self.val_loader)}]',
-                    'Time': f'{batch_time.val:.3f}({batch_time.avg:.3f})',
-                    'Loss': f'{losses.val:.4f}({losses.avg:.4f})',
-                    'Prec@1': f'{top1.val:06.3f}({top1.avg:06.3f})',
-                    'Prec@5': f'{top5.val:06.3f}({top5.avg:06.3f})'
-                }
-                pbar_batch.set_postfix(postfix)
+                if self.rank == 0:
+                    postfix = {
+                        'Test': f'[{i}/{len(self.val_loader)}]',
+                        'Time': f'{batch_time.val:.3f}({batch_time.avg:.3f})',
+                        'Loss': f'{losses.val:.4f}({losses.avg:.4f})',
+                        'Prec@1': f'{top1.val:06.3f}({top1.avg:06.3f})',
+                        'Prec@5': f'{top5.val:06.3f}({top5.avg:06.3f})'
+                    }
+                    pbar_batch.set_postfix(postfix)
 
-            print(f' * Prec@1 {top1.avg:.3f} Prec@5 {top5.avg:.3f}')
-        
-            # 将验证指标写入TensorBoard
-            self.writer.add_scalar('Val/Loss', losses.avg, epoch)
-            self.writer.add_scalar('Val/Prec@1', top1.avg, epoch)
-            self.writer.add_scalar('Val/Prec@5', top5.avg, epoch)
+            if self.rank == 0:
+                print(f' * Prec@1 {top1.avg:.3f} Prec@5 {top5.avg:.3f}')
+                # 将验证指标写入TensorBoard
+                if self.writer is not None:
+                    self.writer.add_scalar('Val/Loss', losses.avg, epoch)
+                    self.writer.add_scalar('Val/Prec@1', top1.avg, epoch)
+                    self.writer.add_scalar('Val/Prec@5', top5.avg, epoch)
 
         return top1.avg
 
+    def _reduce_tensor(self, tensor_data):
+        rt = torch.tensor(tensor_data).to(self.device)
+        dist.all_reduce(rt, op=dist.ReduceOp.SUM)
+        rt /= dist.get_world_size()
+        return rt
+
     def save_checkpoint(self, epoch, prec1, is_best, filename='resnet18', epoch_interval=10):
         """保存检查点"""
+        if self.rank != 0:
+            return
         save_dir_pure = 'checkpoints/saved/weights_only_checkpoints/'
         save_dir_full = 'checkpoints/saved/full_checkpoints/'
         os.makedirs(save_dir_pure, exist_ok=True)
@@ -331,7 +411,8 @@ class SceneRecognitionTrainer:
         if self.cfg.evaluate:
             self.best_prec1 = 0
             self.validate(0)
-            self.writer.close()
+            if self.rank == 0 and self.writer is not None:
+                self.writer.close()
             return
 
         # 训练循环
@@ -351,17 +432,47 @@ class SceneRecognitionTrainer:
             self.scheduler.step()
 
         # 关闭TensorBoard writer
-        self.writer.close()
+        if self.rank == 0 and self.writer is not None:
+            self.writer.close()
 
+def main_ddp(rank, cfg):
+    """DDP主函数"""
+    try:
+        # 设置分布式训练环境
+        setup(rank, cfg.world_size)
+    
+        # 设置随机种子
+        seed_all(42)
+        
+        # 创建trainer实例
+        trainer = SceneRecognitionTrainer(cfg)
+        trainer.train()
+    finally:
+        # 清理环境
+        cleanup()
 
 def main(cfg):
     """主函数"""
     os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
     os.environ["CUDA_VISIBLE_DEVICES"]=cfg.GPUs
+    # 获取GPU数量
+    world_size = torch.cuda.device_count()
+    cfg.world_size = world_size
+    
+    # 如果只有一个GPU，即使配置要求DDP也不使用
+    if cfg.world_size == 1:
+        cfg.use_DDP = False
+        print("Only one GPU available, DDP disabled.")
+    
 
-    seed_all(42)
-    trainer = SceneRecognitionTrainer(cfg)
-    trainer.train()
+    if cfg.use_DDP:
+        # 使用多GPU分布式训练
+        mp.spawn(main_ddp, args=(cfg, ), nprocs=cfg.world_size, join=True)
+    else:
+        # 单GPU训练
+        seed_all(42)
+        trainer = SceneRecognitionTrainer(cfg)
+        trainer.train()
 
 
 if __name__ == '__main__':

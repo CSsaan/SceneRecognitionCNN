@@ -9,7 +9,7 @@ class AttentionAggregator(nn.Module):
         
     def forward(self, tokens):
         # tokens: [batch_size, seq_len, hidden_size]
-        attention_weights = torch.softmax(self.attention(tokens), dim=1)  # [batch_size, seq_len, 1]
+        attention_weights = torch.softmax(self.attention(tokens), dim=1)  # [batch_size, seq_len, hidden_size]
         weighted_tokens = tokens * attention_weights  # [batch_size, seq_len, hidden_size]
         aggregated = weighted_tokens.sum(dim=1)  # [batch_size, hidden_size]
         return aggregated
