@@ -1,4 +1,4 @@
-num_classes: 365            # number of classes
+num_classes: 56            # number of classes
 img_size: 224               # input image size
 
 dataset_dir: '../Datasets/places365standard_easyformat/places365_standard' # '../Datasets/places365standard_easyformat/places365_standard' | '../Datasets/CUB_200_2011'
@@ -10,10 +10,10 @@ use_freeze_backbone: True  # freeze backbone when transfer-learning
 use_dataLoaderCache: False # use cache for faster dataloading(but use more memory)
 use_amp: True              # use automatic mixed precision
 use_DDP: True              # use Distributed Data Parallel
-GPUs: '0,1'                # GPU IDs for DD
+GPUs: '0,1'                # GPU IDs for training(e.g. '0,1' for two GPUs, '1' for one GPU)
 
 arch: 'resnet18'            # model architecture in torchvision.models(e.g. resnet18, vgg, etc)
-epochs: 60                  # number of epochs to train
+epochs: 90                  # number of epochs to train
 
 scheduler: 'cosine'         # (cosine, cosine_warmup, step, multistep, linear)
 lr: 0.001                   # starting learning rate(finetune or transfer-learning needs small lr, e.g. 0.00001)

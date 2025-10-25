@@ -12,3 +12,4 @@ runs/
 checkpoints/
 export/outputs/
 cam-heatmap.jpg
+test/

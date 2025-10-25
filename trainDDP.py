@@ -275,7 +275,7 @@ class SceneRecognitionTrainer:
                     'Time': f'{batch_time.val:.3f}({batch_time.avg:.3f})',
                     'Data': f'{data_time.val:.3f}({data_time.avg:.3f})',
                     'Loss': f'{losses.val:.4f}({losses.avg:.4f})',
-                    'LR': f'{current_lr:.6f}',
+                    'LR': f'{current_lr:.7f}',
                     'Prec@1': f'{top1.val:06.3f}({top1.avg:06.3f})',
                     'Prec@5': f'{top5.val:06.3f}({top5.avg:06.3f})'
                 }

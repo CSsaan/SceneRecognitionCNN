@@ -24,6 +24,11 @@ class DinoV3Linear(nn.Module):
             for p in self.backbone.parameters():
                 p.requires_grad = False
             self.backbone.eval()
+
+            # train last N players
+            for layer in self.backbone.layer[-1:]:
+                for p in layer.parameters():
+                    p.requires_grad = True
         
         hidden_size = getattr(backbone.config, "hidden_size", None)
         if hidden_size is None:
