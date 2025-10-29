@@ -12,6 +12,8 @@ import numpy as np
 
 from models import DinoV3Linear
 from models import ResNetLinear
+from models import FastVitLinear
+from models.fastvit import fastvit_t8, fastvit_t12, fastvit_s12, fastvit_sa12, fastvit_sa24, fastvit_sa36, fastvit_ma36
 
 
 def load_model(arch, num_classes, resume, device):
@@ -36,6 +38,22 @@ def load_model(arch, num_classes, resume, device):
     elif arch.lower().startswith('resnet') or arch.lower().startswith('vgg'):
         backbone = models.__dict__[arch](num_classes=365)
         model = backbone # ResNetLinear(backbone, num_classes)  # freeze backbone
+    elif arch.lower().startswith('fastvit'):
+        # 根据架构名称选择合适的FastViT变体
+        fastvit_models = {
+            'fastvit_t8': fastvit_t8,
+            'fastvit_t12': fastvit_t12,
+            'fastvit_s12': fastvit_s12,
+            'fastvit_sa12': fastvit_sa12,
+            'fastvit_sa24': fastvit_sa24,
+            'fastvit_sa36': fastvit_sa36,
+            'fastvit_ma36': fastvit_ma36,
+        }
+        constructor = fastvit_models.get(arch.lower())
+        if constructor is None:
+            raise ValueError(f"Unsupported FastViT architecture '{arch}'")
+        backbone = constructor()
+        model = FastVitLinear(backbone, num_classes)
     else:
         raise ValueError(f"Unsupported architecture '{arch}'")
 
@@ -238,17 +256,17 @@ def benchmark_model(model, img_path, device, times=100):
 
 def main():
     parser = argparse.ArgumentParser(description='Scene Recognition Inference')
-    parser.add_argument('--arch', type=str, default='resnet18', 
-                        help='模型架构: dinov3, resnet18, swin 等')
-    parser.add_argument('--num_classes', type=int, default=365,
+    parser.add_argument('--arch', type=str, default='dinov3', 
+                        help='模型架构: dinov3, resnet18, swin, fastvit_xxx 等')
+    parser.add_argument('--num_classes', type=int, default=56,
                         help='类别数量')
     parser.add_argument('--img_name', type=str, default='./test/input/snow.jpg',
                         help='测试图像路径')
     parser.add_argument('--video_name', type=str, default='./test/input/video_VLOG02_Newyork.mp4',
                         help='测试视频路径')
-    parser.add_argument('--resume', type=str, default='./checkpoints/weights/resnet18_places365.pth',
+    parser.add_argument('--resume', type=str, default='./checkpoints/saved/weights_only_checkpoints/dinov3_Epoch60_83.911_pure.pth',
                         help='模型权重路径')
-    parser.add_argument('--categories_file_name', type=str, default='./docs/categories_places365.txt',
+    parser.add_argument('--categories_file_name', type=str, default='./docs/categories_places56.txt',
                         help='类别标签文件路径')
     parser.add_argument('--device', type=str, default='cuda' if torch.cuda.is_available() else 'cpu',
                         help='设备类型: cuda 或 cpu')
@@ -264,11 +282,6 @@ def main():
     # 加载类别
     classes = load_classes(args.categories_file_name)
     
-    # 如果提供了视频路径，则处理视频
-    if args.video_name:
-        output_video_path = './test/output_' + os.path.basename(args.video_name)
-        predict_video(model, args.video_name, classes, args.device, output_video_path)
-    
     # 进行图像预测
     results = predict_image(model, args.img_name, classes, args.device)
     print('{} prediction on {} using {}'.format(args.arch, args.img_name, args.device))
@@ -280,6 +293,10 @@ def main():
         latency = benchmark_model(model, args.img_name, args.device, args.benchmark_times)
         print(f"Latency: {latency:.0f}ms")
 
+    # 如果提供了视频路径，则处理视频
+    if args.video_name and os.path.isfile(args.video_name):
+        output_video_path = './test/output_' + os.path.basename(args.video_name)
+        predict_video(model, args.video_name, classes, args.device, output_video_path)
 
 if __name__ == '__main__':
     main()

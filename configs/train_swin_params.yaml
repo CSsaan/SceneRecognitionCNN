@@ -29,71 +29,72 @@ evaluate: False             # evaluate model on validation set
 
 # Swin Transformer Model
 FUSED_LAYERNORM: False
-DROP_RATE: 0.0
-DROP_PATH_RATE: 0.1
+MODEL:
+  DROP_RATE: 0.0
+  DROP_PATH_RATE: 0.1
 
-SWIN:
-  PATCH_SIZE: 4
-  IN_CHANS: 3
-  EMBED_DIM: 96
-  DEPTHS: [2, 2, 6, 2]
-  NUM_HEADS: [3, 6, 12, 24]
-  WINDOW_SIZE: 7
-  MLP_RATIO: 4.
-  QKV_BIAS: True
-  QK_SCALE: None
-  APE: False
-  PATCH_NORM: True
+  SWIN:
+    PATCH_SIZE: 4
+    IN_CHANS: 3
+    EMBED_DIM: 96
+    DEPTHS: [2, 2, 6, 2]
+    NUM_HEADS: [3, 6, 12, 24]
+    WINDOW_SIZE: 7
+    MLP_RATIO: 4.
+    QKV_BIAS: True
+    QK_SCALE: None
+    APE: False
+    PATCH_NORM: True
 
-SWINV2:
-  PATCH_SIZE: 4
-  IN_CHANS: 3
-  EMBED_DIM: 96
-  DEPTHS: [2, 2, 6, 2]
-  NUM_HEADS: [3, 6, 12, 24]
-  WINDOW_SIZE: 7
-  MLP_RATIO: 4.
-  QKV_BIAS: True
-  APE: False
-  PATCH_NORM: True
-  PRETRAINED_WINDOW_SIZES: [0, 0, 0, 0]
+  SWINV2:
+    PATCH_SIZE: 4
+    IN_CHANS: 3
+    EMBED_DIM: 96
+    DEPTHS: [2, 2, 6, 2]
+    NUM_HEADS: [3, 6, 12, 24]
+    WINDOW_SIZE: 7
+    MLP_RATIO: 4.
+    QKV_BIAS: True
+    APE: False
+    PATCH_NORM: True
+    PRETRAINED_WINDOW_SIZES: [0, 0, 0, 0]
 
-SWIN_MOE:
-  PATCH_SIZE: 4
-  IN_CHANS: 3
-  EMBED_DIM: 96
-  DEPTHS: [2, 2, 6, 2]
-  NUM_HEADS: [3, 6, 12, 24]
-  WINDOW_SIZE: 7
-  MLP_RATIO: 4.
-  QKV_BIAS: True
-  QK_SCALE: None
-  APE: False
-  PATCH_NORM: True
-  MLP_FC2_BIAS: True
-  INIT_STD: 0.02
-  PRETRAINED_WINDOW_SIZES: [0, 0, 0, 0]
-  MOE_BLOCKS: [[-1], [-1], [-1], [-1]]
-  NUM_LOCAL_EXPERTS: 1
-  TOP_VALUE: 1
-  CAPACITY_FACTOR: 1.25
-  COSINE_ROUTER: False
-  NORMALIZE_GATE: False
-  USE_BPR: True
-  IS_GSHARD_LOSS: False
-  GATE_NOISE: 1.0
-  COSINE_ROUTER_DIM: 256
-  COSINE_ROUTER_INIT_T: 0.5
-  MOE_DROP: 0.0
-  AUX_LOSS_WEIGHT: 0.01
+  SWIN_MOE:
+    PATCH_SIZE: 4
+    IN_CHANS: 3
+    EMBED_DIM: 96
+    DEPTHS: [2, 2, 6, 2]
+    NUM_HEADS: [3, 6, 12, 24]
+    WINDOW_SIZE: 7
+    MLP_RATIO: 4.
+    QKV_BIAS: True
+    QK_SCALE: None
+    APE: False
+    PATCH_NORM: True
+    MLP_FC2_BIAS: True
+    INIT_STD: 0.02
+    PRETRAINED_WINDOW_SIZES: [0, 0, 0, 0]
+    MOE_BLOCKS: [[-1], [-1], [-1], [-1]]
+    NUM_LOCAL_EXPERTS: 1
+    TOP_VALUE: 1
+    CAPACITY_FACTOR: 1.25
+    COSINE_ROUTER: False
+    NORMALIZE_GATE: False
+    USE_BPR: True
+    IS_GSHARD_LOSS: False
+    GATE_NOISE: 1.0
+    COSINE_ROUTER_DIM: 256
+    COSINE_ROUTER_INIT_T: 0.5
+    MOE_DROP: 0.0
+    AUX_LOSS_WEIGHT: 0.01
 
-SWIN_MLP:
-  PATCH_SIZE: 4
-  IN_CHANS: 3
-  EMBED_DIM: 96
-  DEPTHS: [2, 2, 6, 2]
-  NUM_HEADS: [3, 6, 12, 24]
-  WINDOW_SIZE: 7
-  MLP_RATIO: 4.
-  APE: False
-  PATCH_NORM: True
+  SWIN_MLP:
+    PATCH_SIZE: 4
+    IN_CHANS: 3
+    EMBED_DIM: 96
+    DEPTHS: [2, 2, 6, 2]
+    NUM_HEADS: [3, 6, 12, 24]
+    WINDOW_SIZE: 7
+    MLP_RATIO: 4.
+    APE: False
+    PATCH_NORM: True

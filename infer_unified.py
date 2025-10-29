@@ -12,6 +12,8 @@ from transformers import AutoModel
 
 from models import DinoV3Linear
 from models import ResNetLinear
+from models import FastVitLinear
+from models.fastvit import fastvit_t8, fastvit_t12, fastvit_s12, fastvit_sa12, fastvit_sa24, fastvit_sa36, fastvit_ma36
 
 # 全局变量用于存储特征
 features_blobs = []
@@ -109,6 +111,22 @@ def load_model(arch, num_classes, resume, device):
     elif arch.lower().startswith('resnet') or arch.lower().startswith('vgg'):
         backbone = models.__dict__[arch](num_classes=365)
         model = ResNetLinear(backbone, num_classes)
+    elif arch.lower().startswith('fastvit'):
+        # 根据架构名称选择合适的FastViT变体
+        fastvit_models = {
+            'fastvit_t8': fastvit_t8,
+            'fastvit_t12': fastvit_t12,
+            'fastvit_s12': fastvit_s12,
+            'fastvit_sa12': fastvit_sa12,
+            'fastvit_sa24': fastvit_sa24,
+            'fastvit_sa36': fastvit_sa36,
+            'fastvit_ma36': fastvit_ma36,
+        }
+        constructor = fastvit_models.get(arch.lower())
+        if constructor is None:
+            raise ValueError(f"Unsupported FastViT architecture '{arch}'")
+        backbone = constructor()
+        model = FastVitLinear(backbone, num_classes)
     else:
         raise ValueError(f"Unsupported architecture '{arch}'")
 
@@ -130,8 +148,10 @@ def load_model(arch, num_classes, resume, device):
     if arch.lower().startswith('dinov3'):
         model.backbone.layer[-1].register_forward_hook(hook_feature)
     elif arch.lower().startswith('resnet') or arch.lower().startswith('vgg'):
-        model.backbone.layer4.register_forward_hook(hook_feature)
+        model.backbone.layer4.register_forward_hook(hook_feature) # (512, 7, 7)
         model.backbone.avgpool.register_forward_hook(hook_feature)
+    elif arch.lower().startswith('fastvit'):
+        model.backbone.conv_exp.se.register_forward_hook(hook_feature) # (768, 7, 7)
     else:
         raise ValueError(f"Unsupported architecture '{arch}'")
 
@@ -221,6 +241,8 @@ def predict_and_visualize(model, img_path, classes, labels_IO, labels_attribute,
             try:
                 if arch.lower().startswith('dinov3'):
                     CAMs = returnDinoV3CAM(features_blobs[0])  # 获取热力图
+                elif arch.lower().startswith('fastvit'):
+                    CAMs = returnResnetCAM(features_blobs[0], weight_softmax, [idx[0]])  # 获取热力图
                 elif arch.lower().startswith('resnet') or arch.lower().startswith('vgg'):
                     CAMs = returnResnetCAM(features_blobs[0], weight_softmax, [idx[0]])  # 获取热力图
                 else:
@@ -238,6 +260,8 @@ def predict_and_visualize(model, img_path, classes, labels_IO, labels_attribute,
                     result['cam_path'] = cam_output_path
             except Exception as e:
                 print(f"Error generating CAM: {e}")
+    else:
+        print("No features blobs found. Please check your model architecture.")
 
     return result
 
@@ -263,7 +287,7 @@ def predict_video_with_cam(model, video_path, classes, labels_IO, arch, device, 
     # 获取softmax权重 (用于ResNet/VGG的CAM)
     params = list(model.parameters())
     weight_softmax = None
-    if arch.lower().startswith('resnet') or arch.lower().startswith('vgg'):
+    if arch.lower().startswith('resnet') or arch.lower().startswith('vgg') or arch.lower().startswith('fastvit'):
         weight_softmax = params[-2].data.cpu().numpy()
         weight_softmax[weight_softmax < 0] = 0
 
@@ -350,6 +374,8 @@ def predict_video_with_cam(model, video_path, classes, labels_IO, arch, device, 
             try:
                 if arch.lower().startswith('dinov3'):
                     CAMs = returnDinoV3CAM(features_blobs[0])
+                elif arch.lower().startswith('fastvit'):
+                    CAMs = returnResnetCAM(features_blobs[0], weight_softmax, [idx[0]])
                 elif arch.lower().startswith('resnet') or arch.lower().startswith('vgg'):
                     CAMs = returnResnetCAM(features_blobs[0], weight_softmax, [idx[0]])
                 else:
@@ -415,7 +441,7 @@ def benchmark_model(model, img_path, device, times=100):
 def main():
     parser = argparse.ArgumentParser(description='Scene Recognition Inference with Visualization')
     parser.add_argument('--arch', type=str, default='dinov3',
-                        help='模型架构: dinov3, resnet18 等')
+                        help='模型架构: dinov3, resnet18, fastvit_xxx 等')
     parser.add_argument('--num_classes', type=int, default=56,
                         help='类别数量')
     parser.add_argument('--img_name', type=str, default='./test/input/snow.jpg',
@@ -451,11 +477,6 @@ def main():
     # 加载模型
     model = load_model(args.arch, args.num_classes, args.resume, args.device)
 
-    # 如果提供了视频路径，则处理视频
-    if args.video_name:
-        output_video_path = './test/output_' + os.path.basename(args.video_name)
-        predict_video_with_cam(model, args.video_name, classes, labels_IO, args.arch, args.device, 3, output_video_path)
-
     # 进行预测和可视化
     result = predict_and_visualize(
         model, args.img_name, classes, labels_IO, labels_attribute, W_attribute,
@@ -479,6 +500,11 @@ def main():
     if args.benchmark:
         latency = benchmark_model(model, args.img_name, args.device, args.benchmark_times)
         print(f"Latency: {latency:.0f}ms")
+
+    # 如果提供了视频路径，则处理视频
+    if args.video_name:
+        output_video_path = './test/output_' + os.path.basename(args.video_name)
+        predict_video_with_cam(model, args.video_name, classes, labels_IO, args.arch, args.device, 3, output_video_path)
 
 
 if __name__ == '__main__':

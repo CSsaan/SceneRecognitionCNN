@@ -1,0 +1,28 @@
+num_classes: 56            # number of classes
+img_size: 224               # input image size
+
+dataset_dir: '../Datasets/places365standard_easyformat/places365_standard' # '../Datasets/places365standard_easyformat/places365_standard'  '../Datasets/CUB_200_2011'
+
+pretrained_weights: './checkpoints/weights/fastvit_t8_weights.pth' # path to pretrained weights
+resume: '' # Checkpoint resuming | path to latest checkpoint (default: None)
+
+use_freeze_backbone: True  # freeze backbone when transfer-learning
+use_dataLoaderCache: False # use cache for faster dataloading(but use more memory)
+use_amp: True              # use automatic mixed precision
+use_DDP: True              # use Distributed Data Parallel
+GPUs: '0,1'                # GPU IDs for training(e.g. '0,1' for two GPUs, '1' for one GPU)
+
+arch: 'fastvit_t8'          # model architecture in torchvision.models(e.g. fastvit_t8 fastvit_t12 fastvit_s12 fastvit_sa12 fastvit_sa24 fastvit_sa36 fastvit_ma36)
+epochs: 90                  # number of epochs to train
+
+scheduler: 'cosine'         # (cosine, cosine_warmup, step, multistep, linear)
+lr: 0.001                 # starting learning rate(finetune or transfer-learning needs small lr, e.g. 0.00001)
+batch_size: 128             # batch size
+workers: 8                  # number of data loading workers
+
+optimizer: 'adamw'          # (adamw, sgd, fused_adam, fused_lamb)
+momentum: 0.9               # momentum in Optimizer(Only applies to SGD)
+weight_decay: 0.001         # weight decay in Optimizer
+label_smoothing: 0.1        # label smoothing(default: 0.1)
+
+evaluate: False             # evaluate model on validation set

@@ -1,6 +1,6 @@
 # Scene Recognition CNN
 
-基于卷积神经网络的场景识别系统，用于自然场景环境分类任务。该系统支持多种深度学习模型架构，包括ResNet系列、DINOv3和Swin Transformer，并提供了高效的训练和推理流程。
+基于卷积神经网络的场景识别系统，用于自然场景环境分类任务。该系统支持多种深度学习模型架构，包括ResNet系列、DINOv3、Swin Transformer和FastViT，并提供了高效的训练和推理流程。
 
 ## 目录
 
@@ -21,6 +21,7 @@
     - [ResNet Linear](#resnet-linear)
     - [DINOv3 Linear](#dinov3-linear)
     - [Swin Transformer](#swin-transformer)
+    - [FastViT](#fastvit)
   - [训练模型](#训练模型)
     - [训练选项](#训练选项)
   - [推理预测](#推理预测)
@@ -43,7 +44,7 @@ Scene Recognition CNN是一个专门用于自然场景识别的深度学习项�
 
 ## 主要特性
 
-- 多种模型架构支持（ResNet系列、DINOv3、Swin Transformer）
+- 多种模型架构支持（ResNet系列、DINOv3、Swin Transformer、FastViT）
 - 高效的数据加载和缓存机制
 - 混合精度训练支持
 - TensorBoard可视化集成
@@ -68,6 +69,8 @@ Scene Recognition CNN是一个专门用于自然场景识别的深度学习项�
 - TQDM >= 4.67.1
 - ONNX >= 1.16.0
 - ONNX Runtime >= 1.18.0
+- Timm >= 0.9.0
+- DotMap >= 1.3.30
 
 ## 项目结构
 
@@ -76,14 +79,18 @@ SceneRecognitionCNN/
 ├── configs/                    # 配置文件目录
 │   ├── train_resnet18_params.yaml
 │   ├── train_dinov3_params.yaml
-│   └── train_swin_params.yaml
+│   ├── train_swin_params.yaml
+│   └── train_fastvit_params.yaml
 ├── export/                     # 模型导出目录
 │   ├── export_onnx.py          # ONNX导出脚本
 │   ├── infer_onnx.py           # ONNX推理脚本
 │   └── outputs/                # 导出模型目录
 │       ├── *.onnx              # ONNX模型文件
 ├── models/                     # 模型定义目录
+│   ├── fastvit/                # FastViT模型源码
+│   ├── swin_transformer/       # Swin Transformer模型源码
 │   ├── dinov3_linear.py
+│   ├── fastvit_linear.py
 │   ├── resnet_linear.py
 │   └── swin_linear.py
 ├── utils/                      # 工具函数目录
@@ -146,6 +153,8 @@ places365_standard/
 
 ### 下载预训练权重
 
+打包百度网盘下载链接：[https://pan.baidu.com/s/11RPEfG1yb_WrHpSNoQPF8w?pwd=7mxx](https://pan.baidu.com/s/11RPEfG1yb_WrHpSNoQPF8w?pwd=7mxx)
+
 对于ResNet模型，可以从Places365项目下载预训练权重：
 
 ```bash
@@ -157,13 +166,16 @@ wget http://places2.csail.mit.edu/models_places365/resnet18_places365.pth.tar -P
 
 对于Swin Transformer模型，可以从官方仓库下载预训练权重。
 
+对于FastViT模型，我是从timm库中导出的预训练模型，并放置于`checkpoints/weights/`目录下。
+
 ## 配置文件
 
-项目使用YAML配置文件来管理训练参数。提供了三个示例配置文件：
+项目使用YAML配置文件来管理训练参数。提供了四个示例配置文件：
 
 1. [configs/train_resnet18_params.yaml](configs/train_resnet18_params.yaml) - ResNet18配置
 2. [configs/train_dinov3_params.yaml](configs/train_dinov3_params.yaml) - DINOv3配置
 3. [configs/train_swin_params.yaml](configs/train_swin_params.yaml) - Swin Transformer配置
+4. [configs/train_fastvit_params.yaml](configs/train_fastvit_params.yaml) - FastViT配置
 
 主要配置项包括：
 
@@ -172,7 +184,7 @@ wget http://places2.csail.mit.edu/models_places365/resnet18_places365.pth.tar -P
 - `dataset_dir`: 数据集路径
 - `pretrained_weights`: 预训练权重路径
 - `resume`: 恢复训练的检查点路径
-- `arch`: 模型架构（resnet18, dinov3, swin等）
+- `arch`: 模型架构（resnet18, dinov3, swin, fastvit_t8等）
 - `epochs`: 训练轮数
 - `lr`: 学习率
 - `batch_size`: 批次大小
@@ -193,6 +205,17 @@ wget http://places2.csail.mit.edu/models_places365/resnet18_places365.pth.tar -P
 
 基于Swin Transformer的分类器，支持多种变体（Swin-Tiny, Swin-Small等）。使用窗口注意力机制和层级结构设计，具有良好的性能表现。
 
+### FastViT
+
+基于FastViT的分类器，是一种高效的视觉Transformer架构。FastViT结合了MobileOne和RepLKNet的优势，通过结构重参数化技术实现了高性能和高效率的平衡。该模型特别适合移动设备和边缘计算场景，支持多种变体（fastvit_t8, fastvit_t12, fastvit_s12等）。
+
+FastViT主要特点：
+
+- 使用MobileOne作为基础卷积块，通过结构重参数化实现高效推理
+- 集成RepLKNet的大核卷积，增强感受野
+- 采用注意力机制增强特征表达
+- 支持模型压缩和加速
+
 ## 训练模型
 
 使用以下命令选择配置文件进行训练，在 train.py / trainDDP.py 中指定配置文件：
@@ -201,6 +224,7 @@ wget http://places2.csail.mit.edu/models_places365/resnet18_places365.pth.tar -P
 parser.add_argument('--cfg', type=str, default='configs/train_resnet18_params.yaml') # 使用默认配置训练ResNet18模型
 parser.add_argument('--cfg', type=str, default='configs/train_dinov3_params.yaml') # 使用DINOv3配置训练
 parser.add_argument('--cfg', type=str, default='configs/train_swin_params.yaml') # 使用Swin Transformer配置训练
+parser.add_argument('--cfg', type=str, default='configs/train_fastvit_params.yaml') # 使用FastViT配置训练
 ```
 
 ### 训练选项

@@ -7,6 +7,7 @@ import datetime
 import argparse
 import numpy as np
 from tqdm import tqdm
+from dotmap import DotMap
 
 import torch
 import torch.nn as nn
@@ -91,6 +92,23 @@ class SceneRecognitionTrainer:
             MODEL_NAME_OR_PATH = self.cfg.pretrained_weights # "./checkpoints/weights/dinov3-vits16-pretrain-lvd1689m"
             backbone = AutoModel.from_pretrained(MODEL_NAME_OR_PATH)
             self.model = DinoV3Linear(backbone, self.cfg.num_classes, freeze_backbone=self.cfg.use_freeze_backbone) # freze backbone
+        elif model_name.startswith('fastvit'):
+            from models import FastVitLinear
+            from models.fastvit import fastvit_t8, fastvit_t12, fastvit_s12, fastvit_sa12, fastvit_sa24, fastvit_sa36, fastvit_ma36
+            fastvit_models = {
+                'fastvit_t8': fastvit_t8,
+                'fastvit_t12': fastvit_t12,
+                'fastvit_s12': fastvit_s12,
+                'fastvit_sa12': fastvit_sa12,
+                'fastvit_sa24': fastvit_sa24,
+                'fastvit_sa36': fastvit_sa36,
+                'fastvit_ma36': fastvit_ma36,
+            }
+            constructor = fastvit_models.get(self.cfg.arch.lower())
+            if constructor is None:
+                raise ValueError(f"Unsupported FastViT architecture '{self.cfg.arch}'")
+            backbone = constructor()
+            self.model = FastVitLinear(backbone, self.cfg.num_classes, freeze_backbone=self.cfg.use_freeze_backbone, pretrained_weights_path=self.cfg.pretrained_weights) # freze backbone
         elif model_name.startswith('resnet') or model_name.startswith('vgg'):
             from models import ResNetLinear
             backbone = models.__dict__[self.cfg.arch](num_classes=365) # , pretrained=True
@@ -478,10 +496,13 @@ def main(cfg):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
 
-    # train_resnet18_params.yaml | train_dinov3_params.yaml | train_swin_params.yaml
-    parser.add_argument('--cfg', type=str, default='configs/train_dinov3_params.yaml')
-
+    # train_resnet18_params.yaml | train_dinov3_params.yaml | train_swin_params.yaml | train_fastvit_params.yaml
+    parser.add_argument('--cfg', type=str, default='configs/train_fastvit_params.yaml')
     args = parser.parse_args()
-    cfg = argparse.Namespace(**yaml.load(open(args.cfg), Loader=yaml.SafeLoader))
+
+    cfg = None
+    # cfg = argparse.Namespace(**yaml.load(open(args.cfg), Loader=yaml.SafeLoader))
+    with open(args.cfg) as f:
+        cfg = DotMap(yaml.safe_load(f))
     
     main(cfg)

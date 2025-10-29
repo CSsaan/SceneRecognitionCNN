@@ -16,6 +16,8 @@ sys.path.insert(0, project_root)
 
 from models import DinoV3Linear
 from models import ResNetLinear
+from models import FastVitLinear
+from models.fastvit import fastvit_t8, fastvit_t12, fastvit_s12, fastvit_sa12, fastvit_sa24, fastvit_sa36, fastvit_ma36
 
 
 class PyTorchToONNXConverter:
@@ -113,6 +115,22 @@ if __name__ == "__main__":
     elif arch.lower().startswith('resnet') or arch.lower().startswith('vgg'):
         backbone = models.__dict__[arch](num_classes=365)
         model = ResNetLinear(backbone, num_classes) # freze backbone
+    elif arch.lower().startswith('fastvit'):
+        # 根据架构名称选择合适的FastViT变体
+        fastvit_models = {
+            'fastvit_t8': fastvit_t8,
+            'fastvit_t12': fastvit_t12,
+            'fastvit_s12': fastvit_s12,
+            'fastvit_sa12': fastvit_sa12,
+            'fastvit_sa24': fastvit_sa24,
+            'fastvit_sa36': fastvit_sa36,
+            'fastvit_ma36': fastvit_ma36,
+        }
+        constructor = fastvit_models.get(arch.lower())
+        if constructor is None:
+            raise ValueError(f"Unsupported FastViT architecture '{arch}'")
+        backbone = constructor()
+        model = FastVitLinear(backbone, num_classes)
     else:
         raise ValueError(f"Unsupported architecture '{arch}'")
 
